@@ -1,0 +1,10 @@
+{
+  "layout": { "x": 0, "y": 0, "positioned": false },
+  "geminiModel": "gemini-3.8-live",
+  "tabs": [
+    { "id": "gev", "name": "God’s Eye View", "url": "http://localhost:4173/" },
+    { "id": "home", "name": "Home Assistant", "url": "http://homeassistant.local:8123/" },
+    { "id": "astra", "name": "Astra", "url": "http://localhost:4180/astra" },
+    { "id": "board", "name": "Whiteboard", "url": "http://localhost:4180/whiteboard" }
+  ]
+}

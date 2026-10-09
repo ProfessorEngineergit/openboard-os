@@ -1,0 +1,14 @@
+{
+  "name": "mega-display-kiosk",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "verify": "node server.mjs --verify"
+  },
+  "dependencies": {
+    "puppeteer": "25.10.0",
+    "ws": "8.21.0"
+  }
+}
