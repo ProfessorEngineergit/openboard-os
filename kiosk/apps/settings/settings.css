@@ -178,11 +178,16 @@
 .obs--desktop .obs-stepper .step:hover{background:var(--ob-border)}
 
 .obs-slider{display:flex;align-items:center;gap:16px;flex:none}
+/* Touch: the thumb is drawn 30 px but its hit box is 56 px (transparent border), so a finger always catches it. */
+.obs{--thumb:56px;--thumb-vis:30px;--track:8px}
+.obs--desktop{--thumb:20px;--thumb-vis:18px;--track:6px}
 .obs-range{appearance:none;-webkit-appearance:none;flex:1;min-width:120px;height:var(--ob-touch);background:transparent;margin:0;touch-action:none}
-.obs-range::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--ob-accent) var(--p,50%),var(--ob-surface-3) var(--p,50%))}
-.obs-range::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;margin-top:-11px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.06)}
-.obs--desktop .obs-range::-webkit-slider-thumb{width:18px;height:18px;margin-top:-5px}
-.obs--desktop .obs-range::-webkit-slider-runnable-track{height:6px;margin-top:0}
+.obs-range::-webkit-slider-runnable-track{height:var(--track);border-radius:4px;background:linear-gradient(90deg,var(--ob-accent) calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--f,.5)),var(--ob-surface-3) 0)}
+.obs-range::-webkit-slider-thumb{-webkit-appearance:none;box-sizing:border-box;width:var(--thumb);height:var(--thumb);margin-top:calc((var(--track) - var(--thumb)) / 2);border:calc((var(--thumb) - var(--thumb-vis)) / 2) solid transparent;border-radius:50%;background:#fff;background-clip:padding-box;filter:drop-shadow(0 2px 5px rgba(0,0,0,.38)) drop-shadow(0 0 1px rgba(0,0,0,.2))}
+.obs-range:active::-webkit-slider-thumb{transform:scale(1.06)}
+.obs-range::-moz-range-track{height:var(--track);border-radius:4px;background:var(--ob-surface-3)}
+.obs-range::-moz-range-progress{height:var(--track);border-radius:4px;background:var(--ob-accent)}
+.obs-range::-moz-range-thumb{box-sizing:border-box;width:var(--thumb-vis);height:var(--thumb-vis);border:0;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.38)}
 .obs-range-value{min-width:4.5ch;text-align:right;color:var(--ob-text-dim);font-variant-numeric:tabular-nums}
 
 .obs-icongrid,.obd .obs-icongrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px}

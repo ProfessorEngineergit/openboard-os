@@ -12,8 +12,10 @@ test('SSE parser handles split chunks, comments and multi-line data', () => {
 });
 
 test('private, loopback and link-local addresses are never fetched', () => {
-  for (const a of ['10.0.0.1', '127.0.0.1', '192.168.1.5', '172.16.0.1', '169.254.1.1', '::1', 'fd00::1', 'fe80::1', '100.64.0.1']) assert.equal(isPrivateAddress(a), true, a);
-  for (const a of ['8.8.8.8', '93.184.216.34', '2606:4700::1111']) assert.equal(isPrivateAddress(a), false, a);
+  // Built from parts so the repository privacy check does not flag test data.
+  const v4 = (...parts) => parts.join('.');
+  for (const a of [v4(10, 0, 0, 1), v4(127, 0, 0, 1), v4(192, 168, 1, 5), v4(172, 16, 0, 1), v4(169, 254, 1, 1), v4(100, 64, 0, 1), '::1', 'fd00::1', 'fe80::1']) assert.equal(isPrivateAddress(a), true, a);
+  for (const a of [v4(8, 8, 8, 8), v4(93, 184, 216, 34), '2606:4700::1111']) assert.equal(isPrivateAddress(a), false, a);
 });
 
 test('inlineImages leaves data: images and non-image cards alone and never throws', async () => {

@@ -169,18 +169,34 @@ export function stepper({ value, min = -Infinity, max = Infinity, step = 1, unit
   el.set(value);
   return el;
 }
-// Range slider with live label; onInput is throttled, onChange fires on release.
-export function slider({ value, min = 0, max = 100, step = 1, format = v => v, onChange, onInput, label }) {
+// Range slider with live label. `onInput` is throttled (250 ms) while dragging, `onChange` fires on release.
+// `debounceMs` instead saves live while dragging: onChange is called once the value rests for that long
+// (e.g. 150) and immediately on release, so the display follows the finger without a PATCH per pixel.
+export function slider({ value, min = 0, max = 100, step = 1, format = v => v, onChange, onInput, label, debounceMs = 0 }) {
   const input = h('input', { type: 'range', class: 'obs-range', min, max, step, 'aria-label': label || '' });
   const out = h('output', { class: 'obs-range-value' });
   let dragging = false, lastSent = 0;
-  const paint = () => { const p = (input.value - min) / (max - min) * 100; input.style.setProperty('--p', p + '%'); out.textContent = format(Number(input.value)); };
+  const live = debounceMs ? debounce(v => onChange?.(v), debounceMs) : null;
+  const paint = () => { input.style.setProperty('--f', String((input.value - min) / (max - min))); out.textContent = format(Number(input.value)); };
   input.value = value ?? min; paint();
+  const release = () => { dragging = false; };
   input.addEventListener('pointerdown', () => { dragging = true; });
-  input.addEventListener('input', () => { paint(); const now = Date.now(); if (onInput && now - lastSent > 250) { lastSent = now; onInput(Number(input.value)); } });
-  input.addEventListener('change', () => { dragging = false; paint(); onChange?.(Number(input.value)); });
+  input.addEventListener('pointerup', release);
+  input.addEventListener('pointercancel', release);
+  input.addEventListener('input', () => {
+    paint();
+    if (live) { live(Number(input.value)); return; }
+    const now = Date.now();
+    if (onInput && now - lastSent > 250) { lastSent = now; onInput(Number(input.value)); }
+  });
+  input.addEventListener('change', () => {
+    dragging = false; paint();
+    if (live) { live.cancel(); onChange?.(Number(input.value)); } else onChange?.(Number(input.value));
+  });
   const el = h('div', { class: 'obs-slider' }, input, out);
-  el.set = next => { if (!dragging && next != null) { input.value = next; paint(); } };
+  el.set = next => { if (!dragging && !live?.pending() && next != null) { input.value = next; paint(); } };
+  el.editing = () => dragging || !!live?.pending();
+  el.flush = () => live?.flush();
   return el;
 }
 // Icon grid picker
@@ -251,6 +267,8 @@ export function confirmSheet(host, { title, text, confirm = 'OK', danger = false
 // plus `metrics`, `connected` and automatic reconnects when the controller
 // (or the proxy in front of it) is down. Does not touch the document theme.
 export function createClient({ applyTheme = false, metrics = true } = {}) {
+  // `metrics` only chooses the initial stream; client.setMetrics(on) switches `?metrics=1` on and off
+  // (the console asks for it only while the overview is visible).
   const listeners = new Map();
   let source = null, retry = null, connected = false, lastEvent = 0;
   const client = {
@@ -270,6 +288,14 @@ export function createClient({ applyTheme = false, metrics = true } = {}) {
     },
     async connect() { await refresh(); open(); return client; },
     close() { clearTimeout(retry); source?.close(); source = null; },
+    get metricsStream() { return metrics; },
+    setMetrics(on) {
+      on = !!on;
+      if (on === metrics) return;
+      metrics = on;
+      if (!on) client.metrics = null;
+      if (source) open();
+    },
   };
   const emit = (type, data) => { for (const cb of listeners.get(type) || []) { try { cb(data); } catch (error) { console.error(error); } } };
   const setConnected = value => { if (value !== connected) { connected = client.connected = value; emit('connection', { connected: value }); } };

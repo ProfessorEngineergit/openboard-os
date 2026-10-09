@@ -155,6 +155,7 @@ html:not(.is-ready) .rc{opacity:0}
 .rc-pressure-state .pulse{width:12px;height:12px;border-radius:50%;background:var(--ob-ok);flex:none;animation:obs-pulse 2.4s var(--ob-ease) infinite}
 .rc-pressure-state.warn .pulse{background:var(--ob-warn)}
 .rc-pressure-state.err .pulse{background:var(--ob-err)}
+.rc-pressure-state.off .pulse{background:var(--ob-text-faint);animation:none}
 .rc-pressure .ob-seg{display:flex}
 .rc-pressure .ob-seg button{flex:1}
 .rc-facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:12.5px}
@@ -224,7 +225,11 @@ html:not(.is-ready) .rc{opacity:0}
 .rc-tsep{width:1px;height:20px;margin:0 4px;background:var(--ob-border)}
 .rc-screen-stage{flex:1;min-height:0;border-radius:14px;overflow:hidden;background:#000;border:1px solid var(--ob-border)}
 .rc-screen-stage:fullscreen{border-radius:0;border:0}
-.rc-screen-missing{display:grid;place-items:center;height:100%;padding:40px;color:#9a9aa6;text-align:center;line-height:1.6;max-width:640px;margin:0 auto}
+.rc-screen-missing{display:grid;place-items:center;height:100%;padding:40px;color:#9a9aa6;text-align:center;line-height:1.6}
+.rc-screen-missing>div{max-width:520px}
+.rc-screen-missing b{display:block;color:#f4f5f8;font-size:17px;font-weight:620;margin-bottom:6px}
+.rc-screen-missing p{margin:6px 0}
+.rc-screen-missing code{display:inline-block;margin:6px 0 10px;padding:8px 14px;border-radius:10px;background:#16161c;border:1px solid #26262e;color:#e6e7ec;font:13px var(--ob-font-mono);user-select:all}
 .rc-screen-foot{color:var(--ob-text-faint);font-size:12px}
 .rc-paste{min-height:140px;padding:12px;font:13px/1.5 var(--ob-font-mono);resize:vertical;margin-top:12px}
 
