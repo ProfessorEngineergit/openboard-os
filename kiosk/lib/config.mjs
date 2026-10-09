@@ -37,7 +37,7 @@ export function defaults() {
     astra: { url: '', token: '', voice: true, briefingOnDisplay: true },
     mqtt: { url: '', username: '', password: '', discoveryPrefix: 'homeassistant', nodeId: 'openboard' },
     gemini: { key: '', model: 'gemini-3.8-live' },
-    board: { paper: 'auto', lowLatency: true, prediction: true },
+    board: { paper: 'auto', lowLatency: true, prediction: true, autoHideToolbar: true },
     updates: { enabled: true, branch: 'main', intervalSeconds: 60, restartBrowser: 'idle' },
   };
 }

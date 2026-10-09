@@ -8,7 +8,7 @@ import { createStore } from './store.js';
 import { InkLayer, strokeToElement } from './ink.js';
 import { BoardSync, request, HttpError } from './sync.js';
 import { createOps } from './ops.js';
-import { SWATCHES, PEN_WIDTHS, HIGHLIGHTER, STICKY_COLORS, PAPER_BACKGROUND, displayColor, paperTheme } from './colors.js';
+import { SWATCHES, HL_SWATCHES, PEN_WIDTHS, HIGHLIGHTER, STICKY_COLORS, PAPER_BACKGROUND, displayColor, paperTheme } from './colors.js';
 
 const LAST_BOARD_KEY = 'openboard.board.current';
 const PREFS_KEY = 'openboard.board.prefs';
@@ -61,7 +61,7 @@ export class BoardController {
     this.store = createStore({
       ready: false,
       tool: 'pen', shape: prefs.shape || 'rect', selectMode: 'select',
-      penColor: prefs.penColor || SWATCHES[0].color, hlColor: prefs.hlColor || SWATCHES[7].color,
+      penColor: prefs.penColor || SWATCHES[0].color, hlColor: HL_SWATCHES.some(sw => sw.color === prefs.hlColor) ? prefs.hlColor : HL_SWATCHES[0].color,
       width: prefs.width || 'm',
       collapsed: false, popover: null, sheet: null,
       boards: [], boardId: null, boardName: '',
@@ -119,7 +119,18 @@ export class BoardController {
       prediction: () => this.config.prediction !== false,
       onCommit: stroke => this.commitStroke(stroke),
       onLasso: points => this.lassoSelect(points),
+      onActive: active => this.setInking(active),
     });
+  }
+
+  // Focus mode while writing: the glass toolbar fades out during a stroke and returns shortly after
+  // the last one (config.board.autoHideToolbar, default on). Pure DOM class, no React round trip.
+  setInking(active) {
+    clearTimeout(this.inkingTimer);
+    const root = document.querySelector('.board-root');
+    if (!root) return;
+    if (active) { if (this.config.autoHideToolbar !== false) root.classList.add('inking'); return; }
+    this.inkingTimer = setTimeout(() => root.classList.remove('inking'), 350);
   }
 
   inkStyle() {
@@ -132,7 +143,7 @@ export class BoardController {
   }
 
   onChange(elements, appState, files) {
-    this.sync.track(elements, appState, files);
+    if (this.sync.track(elements, appState, files) && this.undoStale) { this.undoStale = false; this.readHistoryState(); }
     // Excalidraw switches back to selection after text/shapes; mirror that in the toolbar.
     const type = appState.activeTool.type;
     if (type !== this.lastTool) {
@@ -269,7 +280,8 @@ export class BoardController {
     }], { regenerateIds: true });
     api.updateScene({
       elements: [...api.getSceneElementsIncludingDeleted(), note],
-      appState: { selectedElementIds: { [note.id]: true } },
+      // Note text is always ink-colored, whatever pen color is active (applyTool restores it on the next tool change).
+      appState: { selectedElementIds: { [note.id]: true }, currentItemStrokeColor: SWATCHES[0].color },
       captureUpdate: CaptureUpdateAction.IMMEDIATELY,
     });
     this.store.set({ tool: 'select' });
@@ -288,14 +300,18 @@ export class BoardController {
     return document.querySelector(`.board-canvas .${kind}-button-container button`);
   }
 
+  // Excalidraw's history.clear() does not notify its buttons, so after loading a board their DOM state
+  // can be stale: until the next real edit both directions are treated as unavailable.
+  readHistoryState() {
+    const undo = this.historyButton('undo'), redo = this.historyButton('redo');
+    const stale = this.undoStale;
+    this.store.set({ canUndo: !stale && !!undo && !undo.disabled, canRedo: !stale && !!redo && !redo.disabled });
+  }
+
   watchUndo() {
-    const update = () => {
-      const undo = this.historyButton('undo'), redo = this.historyButton('redo');
-      this.store.set({ canUndo: !!undo && !undo.disabled, canRedo: !!redo && !redo.disabled });
-    };
     const root = document.querySelector('.board-canvas');
-    new MutationObserver(update).observe(root, { subtree: true, attributes: true, attributeFilter: ['disabled'], childList: true });
-    update();
+    new MutationObserver(() => this.readHistoryState()).observe(root, { subtree: true, attributes: true, attributeFilter: ['disabled'], childList: true });
+    this.readHistoryState();
   }
 
   history(kind) {
@@ -324,12 +340,28 @@ export class BoardController {
     } catch (error) {
       console.warn('[board] runtime helper unavailable', error);
     }
-    await this.refreshBoards();
-    const boards = this.state.boards;
+    await this.bootBoards();
+  }
+
+  // Opens the remembered (or first) board. Without a reachable server the remembered
+  // board is loaded from the IndexedDB cache and the connection is retried in the background.
+  async bootBoards() {
+    const boards = await this.refreshBoards();
     const remembered = safeStorage(() => localStorage.getItem(LAST_BOARD_KEY), null);
-    const target = boards.find(b => b.id === remembered) || boards[0];
+    const target = boards?.find(b => b.id === remembered) || boards?.[0] || (boards === null && remembered ? { id: remembered } : null);
     if (target) await this.openBoard(target.id);
-    else this.store.set({ ready: true, status: 'offline' });
+    else { this.store.set({ ready: true, status: 'offline' }); this.watchServer(); }
+  }
+
+  // Retries until the server answers, then performs the normal start-up.
+  watchServer() {
+    if (this.serverTimer) return;
+    this.serverTimer = setInterval(async () => {
+      try { await request('/boards'); } catch { return; }
+      clearInterval(this.serverTimer);
+      this.serverTimer = null;
+      if (this.state.boardId) await this.pullRemote(); else await this.bootBoards();
+    }, 4000);
   }
 
   async refreshBoards() {
@@ -340,7 +372,7 @@ export class BoardController {
       if (current) this.store.set({ boardName: current.name });
       return boards;
     } catch {
-      return this.state.boards;
+      return null;
     }
   }
 
@@ -355,14 +387,19 @@ export class BoardController {
       this.store.set({ busy: false, error: error.message });
       if (error instanceof HttpError && error.status === 404) {
         const boards = await this.refreshBoards();
-        if (boards[0] && boards[0].id !== id) return this.openBoard(boards[0].id);
+        if (boards?.[0] && boards[0].id !== id) return this.openBoard(boards[0].id);
       }
+      // Neither server nor local cache: keep an empty, offline board and retry in the background.
+      if (!this.state.boardId) { this.store.set({ ready: true, status: 'offline' }); this.watchServer(); }
+      this.flash(error instanceof HttpError ? 'Board nicht ladbar' : 'Server nicht erreichbar');
       return;
     }
     safeStorage(() => localStorage.setItem(LAST_BOARD_KEY, id));
     const elements = restoreElements(data.elements, null, { refreshDimensions: false, repairBindings: true });
     const app = data.appState || {};
     this.sync.paused = true;
+    // History first, so the (re-rendered) undo/redo buttons reflect the empty stacks of the new board.
+    api.history.clear();
     api.updateScene({
       elements,
       appState: {
@@ -375,7 +412,8 @@ export class BoardController {
     });
     this.sync.acknowledge(api.getSceneElementsIncludingDeleted().filter(el => !this.sync.out.upserts.has(el.id)));
     this.sync.paused = false;
-    api.history.clear();
+    this.undoStale = true;
+    this.readHistoryState();
     const name = data.name || this.state.boards.find(b => b.id === id)?.name || 'Whiteboard';
     this.store.set({ boardId: id, boardName: name, ready: true, busy: false, error: null, snapshots: null });
     this.applyTool();
@@ -389,30 +427,45 @@ export class BoardController {
     if (files.length && boardId === this.state.boardId) this.api.addFiles(files);
   }
 
-  async createBoard(name) {
-    const board = await request('/boards', { method: 'POST', body: { name: name || 'Neues Board' } });
-    await this.refreshBoards();
-    await this.openBoard(board.id);
-    this.store.set({ sheet: null });
-    return board;
+  // Board management needs the server; failures show a notice instead of an unhandled rejection.
+  async serverAction(fn) {
+    try { return await fn(); } catch (error) {
+      console.warn('[board] action failed', error);
+      this.flash(error instanceof HttpError ? error.message : 'Server nicht erreichbar');
+      return undefined;
+    }
   }
 
-  async renameBoard(id, name) {
-    await request(`/boards/${encodeURIComponent(id)}`, { method: 'PATCH', body: { name } });
-    await this.refreshBoards();
+  createBoard(name) {
+    return this.serverAction(async () => {
+      const board = await request('/boards', { method: 'POST', body: { name: name || 'Neues Board' } });
+      await this.refreshBoards();
+      await this.openBoard(board.id);
+      this.store.set({ sheet: null });
+      return board;
+    });
   }
 
-  async deleteBoard(id) {
-    await request(`/boards/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    const boards = await this.refreshBoards();
-    if (id === this.state.boardId && boards[0]) await this.openBoard(boards[0].id);
+  renameBoard(id, name) {
+    return this.serverAction(async () => {
+      await request(`/boards/${encodeURIComponent(id)}`, { method: 'PATCH', body: { name } });
+      await this.refreshBoards();
+    });
+  }
+
+  deleteBoard(id) {
+    return this.serverAction(async () => {
+      await request(`/boards/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const boards = await this.refreshBoards();
+      if (id === this.state.boardId && boards?.[0]) await this.openBoard(boards[0].id);
+    });
   }
 
   async onBoardEvent(event) {
     if (!event) return;
     if (event.kind && event.kind !== 'ops') this.refreshBoards();
     if (event.id !== this.state.boardId) return;
-    if (event.kind === 'deleted') { const boards = await this.refreshBoards(); if (boards[0]) this.openBoard(boards[0].id); return; }
+    if (event.kind === 'deleted') { const boards = await this.refreshBoards(); if (boards?.[0]) this.openBoard(boards[0].id); return; }
     if (event.kind === 'restore') { await this.openBoard(event.id); return; }
     if (event.client === this.clientId || this.sync.ownSeqs.has(event.seq)) return;
     if (Number.isFinite(event.seq) && event.seq <= this.sync.seq) return;
@@ -437,6 +490,10 @@ export class BoardController {
       this.sync.paused = false;
       this.sync.seq = Math.max(this.sync.seq, data.seq);
       this.loadFiles(id, Object.keys(data.scene.files || {}));
+      if (this.state.status === 'offline' || this.state.status === 'error') {
+        // The server answered again: push what is still unsent, otherwise we are in sync.
+        if (this.sync.pendingCount) this.sync.schedule(50); else this.sync.setStatus('saved');
+      }
     } catch (error) {
       console.warn('[board] pull failed', error);
     } finally {
@@ -451,7 +508,7 @@ export class BoardController {
     const st = this.api.getAppState();
     const files = {};
     for (const [fid, f] of Object.entries(this.api.getFiles())) files[fid] = { id: fid, mimeType: f.mimeType };
-    this.sync.writeCache(id, {
+    this.sync.writeCache(id, this.state.boardName, {
       elements: this.api.getSceneElementsIncludingDeleted(),
       appState: { viewBackgroundColor: st.viewBackgroundColor, scrollX: st.scrollX, scrollY: st.scrollY, zoom: { value: st.zoom.value } },
       files,
@@ -515,6 +572,20 @@ export class BoardController {
     api.updateScene({ elements, appState: { selectedElementIds: {} }, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
     this.store.set({ popover: null });
     this.flash('Tafel geleert – Rückgängig möglich');
+  }
+
+  // Selection actions for the contextual bar (Excalidraw's own panel is hidden). Delete is a soft delete
+  // (undoable and synced as tombstone); duplicate reuses Excalidraw's shortcut so bindings/groups stay intact.
+  selectionAction(kind) {
+    const api = this.api;
+    if (kind === 'delete') {
+      const selected = api.getAppState().selectedElementIds;
+      const elements = api.getSceneElementsIncludingDeleted().map(el => (selected[el.id] && !el.isDeleted ? newElementWith(el, { isDeleted: true }) : el));
+      api.updateScene({ elements, appState: { selectedElementIds: {} }, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
+      return;
+    }
+    const container = document.querySelector('.board-canvas .excalidraw');
+    container?.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', code: 'KeyD', ctrlKey: true, bubbles: true, cancelable: true }));
   }
 
   zoomToFit() {

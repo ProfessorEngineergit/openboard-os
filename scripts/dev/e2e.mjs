@@ -45,7 +45,7 @@ if (existsSync(resolve(repo, 'scripts/dev/mock-astra.mjs'))) {
   children.push(spawn(process.execPath, [resolve(repo, 'scripts/dev/mock-astra.mjs'), '--port', '18088', '--token', 'dev'], { stdio: 'ignore' }));
 }
 const chrome = spawn(chromiumPath(), ['--headless=new', `--remote-debugging-port=${DEBUG}`, '--remote-debugging-address=127.0.0.1', `--user-data-dir=${work}/profile`,
-  '--window-size=1920,1080', '--no-first-run', '--disable-pinch', '--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore' });
+  '--window-size=1920,1080', '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore' });
 children.push(chrome);
 await writeFile(`${work}/config.json`, JSON.stringify({
   version: 2,
@@ -257,6 +257,22 @@ try {
     assert.equal((await fetch(base + '/api/v1/state')).status, 401);
   });
 
+  await step('pinch zoom is locked in every app (no --disable-pinch needed)', async () => {
+    const problems = [];
+    for (const [id, prefix] of [['settings', `${APP}/apps/settings/`], ['board', `${APP}/apps/board/`], ['astra', `${APP}/apps/astra/`], ['home', 'http://localhost:8123/']]) {
+      await api(`/api/local/apps/${id}/activate`, { method: 'POST' });
+      const page = await pageFor(prefix);
+      await sleep(600);
+      const session = await page.createCDPSession();
+      await session.send('Input.synthesizePinchGesture', { x: 800, y: 400, scaleFactor: 2.5, relativeSpeed: 600, gestureSourceType: 'touch' }).catch(() => {});
+      await sleep(500);
+      const scale = await page.evaluate(() => window.visualViewport.scale);
+      if (Math.abs(scale - 1) > 0.01) problems.push(`${id}: scale ${scale}`);
+      await session.detach();
+    }
+    assert.deepEqual(problems, []);
+  });
+
   await step('portrait (1080×1920): built-in apps and the dock fit without horizontal overflow', async () => {
     const problems = [];
     for (const [id, prefix] of [['astra', `${APP}/apps/astra/`], ['board', `${APP}/apps/board/`], ['settings', `${APP}/apps/settings/`], ['home', 'http://localhost:8123/']]) {
@@ -285,6 +301,51 @@ try {
       await shot(page, name);
     });
   }
+  // Documentation images: node scripts/dev/e2e.mjs --docs docs/screenshots (synthetic fixtures only).
+  if (process.argv.includes('--docs')) {
+    const docs = resolve(process.argv[process.argv.indexOf('--docs') + 1]);
+    await mkdir(docs, { recursive: true });
+    await api('/api/local/config', { method: 'PATCH', body: { appearance: { theme: 'dark' } } });
+    await step('documentation screenshots', async () => {
+      const grab = async (id, prefix, file, prepare) => {
+        await api(`/api/local/apps/${id}/activate`, { method: 'POST' });
+        const page = await pageFor(prefix);
+        await page.evaluate(() => window.__openboard?.close());
+        if (prepare) await prepare(page);
+        await sleep(1800);
+        await page.screenshot({ path: `${docs}/${file}` });
+        return page;
+      };
+      await grab('gev', 'http://localhost:4173/', 'dock.png', async page => { await page.evaluate(() => window.__openboard.open()); await sleep(600); });
+      await grab('astra', `${APP}/apps/astra/`, 'astra.png');
+      await grab('board', `${APP}/apps/board/`, 'board.png', async page => {
+        await page.waitForFunction(() => !!window.__openboardBoard, { timeout: 20000 });
+        await page.evaluate(async () => {
+          const box = (x, y, w, h, text, color) => ({ type: 'rectangle', x, y, width: w, height: h, backgroundColor: color, fillStyle: 'solid', roundness: { type: 3 }, label: { text, fontSize: 28 } });
+          await window.__openboardBoard.apply({ op: 'add_elements', elements: [
+            { type: 'text', x: 320, y: 150, text: 'Sprint-Planung', fontSize: 40 },
+            box(320, 280, 280, 120, 'Idee', '#a5d8ff'),
+            { type: 'ellipse', x: 820, y: 262, width: 280, height: 156, backgroundColor: '#b2f2bb', fillStyle: 'solid', label: { text: 'Plan', fontSize: 28 } },
+            box(1320, 280, 300, 120, 'Umsetzung', '#ffec99'),
+            { type: 'arrow', x: 600, y: 340, width: 220, height: 0, points: [[0, 0], [220, 0]] },
+            { type: 'arrow', x: 1100, y: 340, width: 220, height: 0, points: [[0, 0], [220, 0]] },
+          ] });
+        });
+        await sleep(1200);
+      });
+      await grab('settings', `${APP}/apps/settings/`, 'settings.png');
+    });
+  }
+  await step('npm run verify (live check script) passes against the running system', async () => {
+    controller.kill(); await sleep(1500);
+    const verifier = spawn(process.execPath, [resolve(repo, 'kiosk/server.mjs'), '--verify'], {
+      env: { ...process.env, OPENBOARD_PORT: String(PORT), OPENBOARD_DEBUG_PORT: String(DEBUG), OPENBOARD_CONFIG: `${work}/config.json`, OPENBOARD_DATA_DIR: `${work}/data`, OPENBOARD_TOKEN_FILE: `${work}/token`, OPENBOARD_STATE_DIR: `${work}/state` },
+      stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = ''; verifier.stdout.on('data', d => { output += d; }); verifier.stderr.on('data', d => { output += d; });
+    const code = await new Promise(resolveExit => { const timer = setTimeout(() => { verifier.kill(); resolveExit(-1); }, 90000); verifier.on('exit', c => { clearTimeout(timer); resolveExit(c); }); });
+    assert.equal(code, 0, output.slice(-1500));
+    assert(/Alle \d+ Prüfungen bestanden/.test(output), output.slice(-800));
+  });
 } finally {
   await browser.disconnect();
   if (!process.argv.includes('--keep')) { for (const child of children) child.kill(); stopFixtures(); }

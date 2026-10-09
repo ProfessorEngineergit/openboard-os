@@ -21,6 +21,7 @@ remote/backup-transfer.*
 *.wav
 
 # Explicitly reviewed synthetic documentation images only.
-!docs/screenshots/glass-panel.png
-!docs/screenshots/launcher.png
-!docs/screenshots/whiteboard.png
+!docs/screenshots/dock.png
+!docs/screenshots/astra.png
+!docs/screenshots/board.png
+!docs/screenshots/settings.png

@@ -318,6 +318,15 @@ export function mountSettings(root, { layout = 'touch', api, section, single = f
         bind({ get: a.get, set: value => { input.value = value ?? ''; input.classList.remove('invalid'); }, editing: () => document.activeElement === input || commit.pending() });
         return input;
       },
+      // Touch friendly slider bound to a config value; saves ~150 ms after the finger rests (and on release).
+      range(spec, { min = 0, max = 1, step = 0.01, format = v => v, label, fallback, debounceMs = 150 } = {}) {
+        const a = acc(spec);
+        const read = cfg => a.get(cfg) ?? fallback;
+        const el = slider({ value: read(store.config), min, max, step, format, label, debounceMs, onChange: value => save(a, value) });
+        p.flushers.push(el.flush);
+        bind({ get: read, set: el.set, editing: el.editing });
+        return el;
+      },
       time(spec, label) {
         const a = acc(spec);
         const input = h('input', { class: 'ob-input obs-time', type: 'time', 'aria-label': label || '' });
@@ -467,9 +476,15 @@ export function mountSettings(root, { layout = 'touch', api, section, single = f
       paintAccent(store.config?.appearance?.accent);
       el.append(
         c.group('Design', [h('div', { class: 'ob-row obs-row is-block' }, cards), times], 'Automatisch wechselt zu den angegebenen Uhrzeiten zwischen Hell und Dunkel. Das Whiteboard-Papier kann eigene Regeln haben (siehe Whiteboard).'),
-        c.group('Glas', [c.row({ label: 'Glas-Effekt', sub: 'Für Dock, Kacheln und Rückfragen.', control: c.segment('appearance.glass', [['webgl', 'WebGL'], ['css', 'CSS'], ['off', 'Aus']], 'Glas-Effekt') })],
+        c.group('Glas', [
+          c.row({ label: 'Glas-Effekt', sub: 'Für Dock, Kacheln und Rückfragen.', control: c.segment('appearance.glass', [['webgl', 'WebGL'], ['css', 'CSS'], ['off', 'Aus']], 'Glas-Effekt') }),
+          c.row({ label: 'Milchglas', sub: 'Mehr Unschärfe hinter dem Dock, die Lichtbrechung am Rand bleibt.', cls: 'has-slider',
+            control: c.range('appearance.frost', { min: 0, max: 1, step: 0.01, fallback: 0.55, format: v => `${Math.round(v * 100)} %`, label: 'Milchglas' }) })],
           'WebGL bricht das Licht wie echtes Glas (Brechung, Fresnel) und kostet auf der Intel-GPU etwa 2–4 % Last, solange das Dock sichtbar ist. CSS ist ein weicher Weichzeichner ohne Lichtbrechung. Aus zeigt matte Flächen und spart am meisten.'),
-        c.group('Akzentfarbe', [h('div', { class: 'ob-row obs-row is-block' }, swatches)], 'Färbt Ringe, Verläufe und ausgewählte Elemente der Shell.'));
+        c.group('Akzentfarbe', [h('div', { class: 'ob-row obs-row is-block' }, swatches)], 'Färbt Ringe, Verläufe und ausgewählte Elemente der Shell.'),
+        c.group('Bildschirmtastatur', [
+          c.row({ label: 'Tastaturgröße', sub: 'Lässt sich auch an den Ecken der Tastatur ziehen.', lead: 'keyboard', cls: 'has-slider',
+            control: c.range('appearance.keyboardScale', { min: 0.5, max: 1.6, step: 0.05, fallback: 1, format: v => `${Math.round(v * 100)} %`, label: 'Tastaturgröße' }) })]));
     },
 
     dock(c, el) {
@@ -602,8 +617,9 @@ export function mountSettings(root, { layout = 'touch', api, section, single = f
       c.live(() => { schedule.hidden = !store.config?.display?.schedule?.enabled; }, ['config']);
       schedule.hidden = !store.config?.display?.schedule?.enabled;
       el.append(card,
+        c.group('Ausrichtung', [c.row({ label: 'Bildausrichtung', control: c.segment('display.orientation', [['landscape', 'Quer'], ['portrait', 'Hoch'], ['landscape-flipped', 'Quer ↻'], ['portrait-flipped', 'Hoch ↻']], 'Ausrichtung') })],
+          'Dreht Bild und Touch (xrandr und Koordinatenmatrix). Hochformat = 1080 × 1920; ↻ dreht um 180°.'),
         c.group('Ruhezustand', [
-          c.row({ label: 'Ausrichtung', sub: 'Dreht Bild und Touch. Hochformat = 1080 × 1920.', control: c.segment('display.orientation', [['landscape', 'Quer'], ['portrait', 'Hoch'], ['landscape-flipped', 'Quer ↻'], ['portrait-flipped', 'Hoch ↻']], 'Ausrichtung') }),
           c.row({ label: 'Art', control: c.segment('display.sleepMode', [['black', 'Schwarzbild'], ['dpms', 'Signal aus (DPMS)']], 'Art des Ruhezustands') }),
           h('div', { class: 'ob-row obs-row is-block' }, explain),
           c.row({ label: 'Automatisch schlafen nach', sub: 'Ohne Berührung. 0 = nie.', control: c.number('display.idleSleepMinutes', { min: 0, max: 600, step: 5, unit: 'min', label: 'Automatisch schlafen' }) }),
@@ -617,7 +633,7 @@ export function mountSettings(root, { layout = 'touch', api, section, single = f
       c.live(() => statusInto(status, 'astra', 'ASTRA', c.state.astra, { ok: 'Verbunden', off: 'Nicht eingerichtet', err: 'Keine Verbindung' }));
       el.append(status,
         c.group('Verbindung', [
-          c.row({ label: 'Adresse', sub: 'z. B. http://192.168.178.189:8088', control: c.text('astra.url', { placeholder: 'http://astra.local:8088', type: 'url', inputmode: 'url', validate: urlCheck(), label: 'ASTRA-Adresse' }) }),
+          c.row({ label: 'Adresse', sub: 'z. B. http://astra.local:8088', control: c.text('astra.url', { placeholder: 'http://astra.local:8088', type: 'url', inputmode: 'url', validate: urlCheck(), label: 'ASTRA-Adresse' }) }),
           c.secret('astra.token', { label: 'Display-Token', help: 'In ASTRA unter Admin → Displays bzw. ASTRA_DISPLAY_TOKEN. Der Browser sieht den Token nie.' }),
           c.tester('astra'),
         ]),
@@ -718,22 +734,26 @@ export function mountSettings(root, { layout = 'touch', api, section, single = f
       const searchBox = h('input', { class: 'ob-input obs-text', type: 'search', placeholder: 'Filtern', spellcheck: 'false', 'aria-label': 'Protokoll filtern' });
       const stamp = h('small', { class: 'obs-log-stamp' });
       let data = { controller: [], update: [] };
+      // Leistungsmanager: the controller may serve its own log; otherwise the action list from the state is shown.
+      const stampLine = ms => new Date(ms).toISOString().replace('T', ' ').slice(0, 19);
+      const performanceLines = () => data.performance || [...(c.state.performance?.actions || [])].reverse().map(entry => `${stampLine(entry.at)} ${entry.text}`);
       async function load() {
         try { data = await store.api('/api/local/logs'); stamp.textContent = `Stand ${new Date().toLocaleTimeString('de-DE')}`; paint(); }
         catch (error) { pre.textContent = `Protokolle nicht verfügbar: ${error.message}`; }
       }
       function paint() {
         const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 40;
-        fillLog(pre, data[source] || [], needle);
+        fillLog(pre, source === 'performance' ? performanceLines() : data[source] || [], needle);
         if (atBottom || !paint.done) pre.scrollTop = pre.scrollHeight;
         paint.done = true;
       }
       searchBox.addEventListener('input', () => { needle = searchBox.value.trim().toLowerCase(); paint(); });
       const timer = setInterval(() => { if (auto && !document.hidden) load(); }, 3000);
       c.cleanup(() => clearInterval(timer));
+      c.live(() => { if (source === 'performance') paint(); }, ['state']);
       load();
       el.append(h('div', { class: 'obs-logbar' },
-        seg([['controller', 'Controller'], ['update', 'Updates']], source, value => { source = value; paint.done = false; paint(); }, { label: 'Protokoll' }),
+        seg([['controller', 'Controller'], ['update', 'Updates'], ['performance', 'Leistung']], source, value => { source = value; paint.done = false; paint(); }, { label: 'Protokoll' }),
         searchBox,
         h('label', { class: 'obs-inline' }, switchEl(auto, value => { auto = value; if (value) load(); }, 'Automatisch aktualisieren'), 'Live'),
         stamp), pre);
@@ -833,6 +853,7 @@ export function mountSettings(root, { layout = 'touch', api, section, single = f
   renderDevice();
   openPage();
   store.ready.then(() => {
+    if (!store.config) { store.connected = false; offlineEl.hidden = false; }   // controller unreachable: say so instead of spinning
     if (page && content.querySelector('.obs-spinner')) openPage({ stack: page.stack });
     if (initialApp && current === 'apps' && store.config?.apps?.some(a => a.id === initialApp)) openApp(ctx(), initialApp, true);
     renderDevice();

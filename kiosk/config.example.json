@@ -1,10 +1,181 @@
 {
-  "layout": { "x": 0, "y": 0, "positioned": false },
-  "geminiModel": "gemini-3.8-live",
-  "tabs": [
-    { "id": "gev", "name": "God’s Eye View", "url": "http://localhost:4173/" },
-    { "id": "home", "name": "Home Assistant", "url": "http://homeassistant.local:8123/" },
-    { "id": "astra", "name": "Astra", "url": "http://localhost:4180/astra" },
-    { "id": "board", "name": "Whiteboard", "url": "http://localhost:4180/whiteboard" }
-  ]
+  "version": 2,
+  "apps": [
+    {
+      "id": "gev",
+      "name": "God’s Eye View",
+      "url": "http://localhost:4173/",
+      "icon": "globe",
+      "builtin": false,
+      "enabled": true,
+      "zoom": 1,
+      "residency": "auto",
+      "weight": "heavy"
+    },
+    {
+      "id": "home",
+      "name": "Home Assistant",
+      "url": "http://homeassistant.local:8123/",
+      "icon": "home",
+      "builtin": false,
+      "enabled": true,
+      "zoom": 0.75,
+      "residency": "always",
+      "weight": "standard"
+    },
+    {
+      "id": "astra",
+      "name": "Astra",
+      "url": "http://localhost:4180/apps/astra/",
+      "icon": "astra",
+      "builtin": true,
+      "enabled": true,
+      "zoom": 1,
+      "residency": "always",
+      "weight": "light"
+    },
+    {
+      "id": "board",
+      "name": "Whiteboard",
+      "url": "http://localhost:4180/apps/board/",
+      "icon": "board",
+      "builtin": true,
+      "enabled": true,
+      "zoom": 1,
+      "residency": "auto",
+      "weight": "standard"
+    },
+    {
+      "id": "settings",
+      "name": "Einstellungen",
+      "url": "http://localhost:4180/apps/settings/",
+      "icon": "settings",
+      "builtin": true,
+      "enabled": true,
+      "zoom": 1,
+      "residency": "eco",
+      "weight": "light"
+    }
+  ],
+  "startApp": "gev",
+  "appearance": {
+    "theme": "dark",
+    "lightFrom": "07:00",
+    "darkFrom": "19:30",
+    "glass": "webgl",
+    "frost": 0.55,
+    "keyboardScale": 1,
+    "accent": "#f4f5f8"
+  },
+  "dock": {
+    "order": [
+      "gev",
+      "home",
+      "astra",
+      "board",
+      "settings"
+    ],
+    "autoHideSeconds": 6,
+    "indicator": "touch",
+    "tiles": [
+      {
+        "id": "t1",
+        "items": [
+          {
+            "id": "w1",
+            "type": "metric.cpu",
+            "options": {
+              "style": "ring"
+            }
+          },
+          {
+            "id": "w2",
+            "type": "metric.gpu",
+            "options": {
+              "style": "ring"
+            }
+          },
+          {
+            "id": "w3",
+            "type": "action.sleep",
+            "options": {}
+          },
+          {
+            "id": "w4",
+            "type": "action.theme",
+            "options": {}
+          }
+        ]
+      },
+      {
+        "id": "t2",
+        "items": [
+          {
+            "id": "w5",
+            "type": "info.clock",
+            "options": {}
+          }
+        ]
+      }
+    ]
+  },
+  "display": {
+    "orientation": "landscape",
+    "sleepMode": "black",
+    "useDdc": false,
+    "idleSleepMinutes": 0,
+    "schedule": {
+      "enabled": false,
+      "sleepAt": "23:30",
+      "wakeAt": "06:45"
+    }
+  },
+  "performance": {
+    "mode": "balanced",
+    "elevatedCpu": 75,
+    "criticalCpu": 92,
+    "sustainSeconds": 20,
+    "memoryFloorMB": 600,
+    "terminate": "ask",
+    "askTimeoutSeconds": 30,
+    "askDefault": "keep",
+    "terminateMinIdleMinutes": 20,
+    "freezeMinIdleMinutes": 3,
+    "prewarm": true,
+    "thermalLimitC": 88,
+    "gev": {
+      "fps": 30,
+      "resolutionScale": 0.8
+    },
+    "alwaysAllow": []
+  },
+  "astra": {
+    "url": "",
+    "token": "",
+    "voice": true,
+    "briefingOnDisplay": true
+  },
+  "mqtt": {
+    "url": "",
+    "username": "",
+    "password": "",
+    "discoveryPrefix": "homeassistant",
+    "nodeId": "openboard"
+  },
+  "gemini": {
+    "key": "",
+    "model": "gemini-3.8-live"
+  },
+  "board": {
+    "paper": "auto",
+    "lowLatency": true,
+    "prediction": true,
+    "autoHideToolbar": true
+  },
+  "updates": {
+    "enabled": true,
+    "branch": "main",
+    "intervalSeconds": 60,
+    "restartBrowser": "idle"
+  }
 }

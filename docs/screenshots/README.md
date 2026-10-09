@@ -1,24 +1,21 @@
 # Öffentliche Demo-Screenshots
 
-Diese Bilder zeigen die tatsächliche Oberfläche aus `kiosk/overlay.js` und
-`kiosk/whiteboard.html`, ausgeführt in einem frischen Browserprofil gegen einen
-temporären lokalen Demo-Server. Der Server liest ausschließlich öffentliche
-Quelltexte. Alle Projekt-Namen, Hintergründe und Zeichenstriche sind künstliche
-Beispieldaten; Home Assistant, GEV, Konten und das installierte Display werden
-nicht kontaktiert. Externe Browser-Anfragen werden blockiert.
+Diese Bilder zeigen die tatsächliche Oberfläche (Shell, Astra, Whiteboard, Einstellungen), ausgeführt in
+einem frischen Browserprofil gegen Attrappen: eine Platzhalter-Karte statt God's Eye View, eine
+Platzhalter-Seite statt Home Assistant und ein Mock für ASTRA (`scripts/dev/fixtures.mjs`,
+`scripts/dev/mock-astra.mjs`). Alle Namen, Termine, Wetterwerte und Zeichnungen sind künstliche
+Beispieldaten; echte Konten, Dienste und das installierte Display werden nicht kontaktiert.
 
-- `glass-panel.png`: fester App-Switcher mit generischen Projekt-Namen.
-- `launcher.png`: derselbe Demo-Hintergrund mit verschobenem 48px-App-Knopf.
-- `whiteboard.png`: reales Whiteboard-UI mit generierter Beispielzeichnung.
+- `dock.png`: Dock mit Widget-Kacheln und App-Kacheln über der Platzhalter-Karte.
+- `astra.png`: Astra-Ruhebild mit Uhr, Briefing, Terminen und Wetter.
+- `board.png`: Whiteboard mit einem generierten Beispiel-Diagramm.
+- `settings.png`: Einstellungen-App.
 
-Das sind Screenshots des heutigen Prototyps, keine Darstellung einer bereits
-fertigen Whiteboard-OS-Arbeitsfläche oder einer Windows-App-Integration.
-
-Neu erzeugen, nach `PUPPETEER_SKIP_DOWNLOAD=true npm ci --prefix kiosk`:
+Neu erzeugen (Headless-Chromium, nach `PUPPETEER_SKIP_DOWNLOAD=true npm ci --prefix kiosk`):
 
 ```bash
-DOCS_BROWSER=/PATH/TO/CHROME node scripts/capture-docs.mjs
+node scripts/dev/e2e.mjs --docs docs/screenshots
 ```
 
-Die PNG-Dateien enthalten keine Text-/EXIF-Metadaten. Nach jeder Neuerzeugung
-müssen alle drei Bilder vor einer Veröffentlichung visuell geprüft werden.
+Die PNG-Dateien enthalten keine Text-/EXIF-Metadaten. Nach jeder Neuerzeugung müssen alle Bilder vor einer
+Veröffentlichung visuell geprüft werden; der Datenschutz-Prüfer erlaubt nur genau diese vier Dateinamen.

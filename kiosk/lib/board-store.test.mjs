@@ -110,7 +110,7 @@ test('creates a default board when none exist', async () => {
   } finally { await t.cleanup(); }
 });
 
-test('migrates the legacy whiteboard (after last clear, eraser skipped, file untouched)', async () => {
+test('migrates the legacy whiteboard (after last clear, file untouched)', async () => {
   const legacy = {
     dark: true,
     strokes: [
@@ -139,10 +139,49 @@ test('migrates the legacy whiteboard (after last clear, eraser skipped, file unt
     assert.equal(els[0].pressures.length, els[0].points.length);
     assert.equal(els[1].points.length, 2); // single point becomes a dot
     const meta = JSON.parse(await readFile(join(t.dataDir, boards[0].id, 'meta.json'), 'utf8'));
-    assert.equal(meta.migratedFrom.skippedErase, 1);
+    assert.equal(meta.migratedFrom.erasers, 1);
+    assert.equal(meta.migratedFrom.skippedErase, 0);
     const original = JSON.parse(await readFile(join(t.root, 'whiteboard', 'current.json'), 'utf8'));
     assert.deepEqual(original, legacy);
   } finally { await t.cleanup(); }
+});
+
+test('convertLegacy applies eraser strokes by cutting earlier strokes (clears reset, later strokes untouched)', () => {
+  const line = (color, y) => ({ color, width: 4, erase: false, points: [{ x: 0, y }, { x: 300, y }] });
+  const eraser = (points, width = 36) => ({ color: '#ef5263', width, erase: true, points });
+  const { elements, erasers, skippedErase } = convertLegacy({
+    dark: false,
+    strokes: [
+      line('#ff0000', 0),                                  // before a clear: dropped entirely
+      { clear: true },
+      line('#258ef1', 0),                                  // cut in the middle
+      line('#21ab83', 100),                                // untouched (far from the eraser)
+      line('#ef5263', 8),                                  // fully erased (all points within the radius)
+      eraser([{ x: 100, y: -30 }, { x: 150, y: 30 }]),     // passes x 100..150 at |y| <= 18 + slack
+      { color: '#182633', width: 8, erase: false, points: [{ x: 120, y: 0 }] }, // drawn after the eraser: stays
+      eraser([{ x: 1000, y: 1000 }]),                      // erases nothing
+    ],
+  });
+  assert.equal(erasers, 2);
+  assert.equal(skippedErase, 0);
+  const blue = elements.filter(e => e.strokeColor === '#258ef1');
+  assert.equal(blue.length, 2, 'the blue line is split in two');
+  assert.ok(blue[0].x === 0 && blue[0].x + blue[0].width < 100 + 1, 'left part ends where the eraser starts');
+  assert.ok(blue[1].x > 150 - 20 && blue[1].x + blue[1].width === 300, 'right part starts behind the eraser');
+  assert.equal(elements.filter(e => e.strokeColor === '#21ab83').length, 1);
+  assert.equal(elements.filter(e => e.strokeColor === '#ff0000').length, 0);
+  assert.equal(elements.filter(e => e.strokeColor === '#1e1e1e').length, 1, 'stroke after the eraser is kept');
+  assert.ok(elements.every(e => e.points.length >= 2 && e.pressures.length === e.points.length));
+});
+
+test('convertLegacy keeps a single-point eraser dot from removing distant strokes and handles a long history', () => {
+  const strokes = [];
+  for (let i = 0; i < 2000; i++) strokes.push({ color: '#258ef1', width: 4, erase: false, points: [{ x: i, y: 0 }, { x: i + 20, y: 30 }] });
+  strokes.push({ color: '#ef5263', width: 36, erase: true, points: [{ x: 1000, y: 10 }] });
+  const t0 = Date.now();
+  const { elements } = convertLegacy({ strokes, dark: true });
+  assert.ok(Date.now() - t0 < 3000, 'eraser pass over 2000 strokes stays fast');
+  assert.ok(elements.length > 1950 && elements.length < 2060, String(elements.length));
 });
 
 test('convertLegacy handles empty and malformed data', () => {

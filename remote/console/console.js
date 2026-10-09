@@ -5,20 +5,28 @@
 // the overview shows an offline state and the VNC view keeps working.
 import { h, icon, fmt, LIFECYCLE, PRESSURE, lifecycleBadge, badge, seg, createClient, createToaster, openSheet, confirmSheet } from '/apps/settings/common.js';
 
-const client = createClient({ metrics: true });
+// The console only streams metrics (`/api/local/events?metrics=1`) while the overview is visible.
+const client = createClient({ metrics: false });
 const app = document.getElementById('console');
 const toaster = createToaster(app);
 const toast = (text, options) => toaster.show(text, options);
 const post = (path, body) => client.api(path, { method: 'POST', body: body ?? {} });
 
 // ------------------------------------------------------------------ theme
-const THEME_KEY = 'ob.console.theme';
+// 'auto' follows the display's effective theme (state.theme, like /ui/app.js does for the apps) and
+// falls back to the browser's preference; 'light'/'dark' pin the console. console/boot.js applies the
+// same rule before the first paint.
+const THEME_KEY = 'ob.console.theme', DISPLAY_THEME_KEY = 'ob.console.display-theme';
 const media = matchMedia('(prefers-color-scheme: light)');
-let themePref = 'system';
-try { themePref = localStorage.getItem(THEME_KEY) || 'system'; } catch { /* storage unavailable */ }
+const store = {
+  get: key => { try { return localStorage.getItem(key); } catch { return null; } },
+  set: (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage unavailable */ } },
+};
+let themePref = store.get(THEME_KEY) || 'auto';
+let displayTheme = store.get(DISPLAY_THEME_KEY);
 function applyTheme() {
-  const theme = themePref === 'system' ? (media.matches ? 'light' : 'dark') : themePref;
-  document.documentElement.dataset.obTheme = theme;
+  const theme = themePref === 'auto' ? (displayTheme || (media.matches ? 'light' : 'dark')) : themePref;
+  if (document.documentElement.dataset.obTheme !== theme) document.documentElement.dataset.obTheme = theme;
 }
 media.addEventListener('change', applyTheme);
 applyTheme();
@@ -33,7 +41,7 @@ const VIEWS = [
 ];
 const nav = h('nav', { class: 'rc-nav', 'aria-label': 'Bereiche' }, VIEWS.map(view => h('a', { href: `#${view.id}`, class: 'rc-nav-item', dataset: { view: view.id } }, icon(view.icon), h('span', null, view.title), h('i', { class: 'rc-nav-badge', hidden: true }))));
 const connPill = h('div', { class: 'rc-conn' });
-const themeSeg = seg([['system', 'System'], ['light', 'Hell'], ['dark', 'Dunkel']], themePref, value => { themePref = value; try { localStorage.setItem(THEME_KEY, value); } catch { /* ignore */ } applyTheme(); }, { label: 'Design der Konsole' });
+const themeSeg = seg([['auto', 'Auto'], ['light', 'Hell'], ['dark', 'Dunkel']], themePref, value => { themePref = value; store.set(THEME_KEY, value); applyTheme(); }, { label: 'Design der Konsole' });
 const side = h('aside', { class: 'rc-side' },
   h('div', { class: 'rc-brand' }, h('span', { class: 'logo' }, icon('screen')), h('div', null, h('b', null, 'OpenBoard'), h('small', null, 'Konsole'))),
   nav,
@@ -50,7 +58,10 @@ function paintConnection() {
   badgeEl.hidden = !prompts; badgeEl.textContent = String(prompts);
 }
 client.on('connection', paintConnection);
-client.on('state', paintConnection);
+client.on('state', state => {
+  paintConnection();
+  if (state?.theme && state.theme !== displayTheme) { displayTheme = state.theme; store.set(DISPLAY_THEME_KEY, displayTheme); applyTheme(); }
+});
 client.on('toast', data => data?.text && toast(data.text, { kind: data.kind === 'error' ? 'err' : data.kind || 'info' }));
 client.on('prompt', prompt => { if (prompt?.text) toast(`Rückfrage: ${prompt.text}`, { kind: 'info', timeout: 6000 }); });
 
@@ -79,6 +90,7 @@ function viewHead(title, sub, ...actions) {
 function overviewView(el) {
   const switcher = h('div', { class: 'rc-switcher', role: 'group', 'aria-label': 'Aktive App' });
   const sleepBtn = h('button', { type: 'button', class: 'ob-btn' });
+  const orientBtn = h('button', { type: 'button', class: 'ob-btn' });
   const offline = h('div', { class: 'rc-offline', hidden: true }, icon('warning'), h('div', null, h('b', null, 'Controller nicht erreichbar'), h('p', null, 'Live-Daten und Einstellungen sind gerade nicht verfügbar. Der Bildschirm per VNC funktioniert weiter; die Konsole verbindet sich automatisch neu.')),
     h('a', { class: 'ob-btn', href: '#bildschirm' }, icon('screen'), 'Bildschirm öffnen'));
   const prompts = h('div', { class: 'rc-prompts' });
@@ -94,7 +106,7 @@ function overviewView(el) {
   const statusCol = h('div', { class: 'rc-statuscol' });
   const actionsList = h('ol', { class: 'rc-actions' });
   el.append(
-    viewHead('Übersicht', 'Live vom Display · alle 2 Sekunden', switcher, sleepBtn),
+    viewHead('Übersicht', 'Live vom Display · alle 2 Sekunden', switcher, orientBtn, sleepBtn),
     offline, prompts,
     h('div', { class: 'rc-grid-charts' }, pressureCard, ...Object.values(charts).map(c => c.el)),
     h('div', { class: 'rc-grid-2' },
@@ -116,6 +128,18 @@ function overviewView(el) {
     sleepBtn.className = `ob-btn ${asleep ? 'primary' : ''}`;
     sleepBtn.disabled = !online;
     sleepBtn.onclick = () => post(`/api/local/display/${asleep ? 'wake' : 'sleep'}`).then(() => toast(asleep ? 'Display wird geweckt' : 'Display schläft', { kind: 'ok' })).catch(error => toast(error.message, { kind: 'err' }));
+    // orientation
+    const orientation = s.display?.orientation || cfg?.display?.orientation || 'landscape', portrait = orientation.startsWith('portrait');
+    orientBtn.replaceChildren(icon('rotate'), portrait ? 'Hochformat' : 'Querformat');
+    orientBtn.title = portrait ? 'Auf Querformat drehen' : 'Auf Hochformat drehen';
+    orientBtn.disabled = !online;
+    orientBtn.onclick = async () => {
+      const next = portrait ? orientation.replace('portrait', 'landscape') : orientation.replace('landscape', 'portrait');
+      orientBtn.disabled = true;
+      try { await client.api('/api/local/config', { method: 'PATCH', body: { display: { orientation: next } } }); cfg = { ...(cfg || {}), display: { ...(cfg?.display || {}), orientation: next } }; toast(portrait ? 'Display dreht auf Querformat' : 'Display dreht auf Hochformat', { kind: 'ok' }); }
+      catch (error) { toast(error.message, { kind: 'err' }); }
+      paintState();
+    };
     // prompts
     const list = s.performance?.prompts || [];
     const key = list.map(p => p.id).join(',');
@@ -129,7 +153,7 @@ function overviewView(el) {
     const modeSeg = seg([['eco', 'Eco'], ['balanced', 'Ausgewogen'], ['max', 'Maximal']], perf.mode || 'balanced', mode => client.api('/api/local/config', { method: 'PATCH', body: { performance: { mode } } }).then(() => toast('Leistungsmodus gespeichert', { kind: 'ok', timeout: 1500 })).catch(error => toast(error.message, { kind: 'err' })), { label: 'Leistungsmodus' });
     pressureCard.replaceChildren(
       h('div', { class: 'rc-card-head' }, h('h2', null, 'Lastlage'), perf.thermalThrottled ? badge('Thermisch gedrosselt', 'warn') : null),
-      h('div', { class: `rc-pressure-state ${p.kind}` }, h('i', { class: 'pulse' }), h('div', null, h('b', null, client.connected ? p.label : '–'), h('small', null, client.connected ? p.text : 'Keine Daten'))),
+      h('div', { class: `rc-pressure-state ${client.connected ? p.kind : 'off'}` }, h('i', { class: 'pulse' }), h('div', null, h('b', null, client.connected ? p.label : '–'), h('small', null, client.connected ? p.text : 'Keine Daten'))),
       modeSeg,
       h('dl', { class: 'rc-facts' },
         h('dt', null, 'Eingriff ab'), h('dd', null, t ? `${t.elevated} % / ${t.critical} % CPU` : '–'),
@@ -209,6 +233,7 @@ function overviewView(el) {
   }
   const history = { cpu: [], gpu: [], ram: [], temp: [], net: [] };
   const limits = { thermal: null };
+  let cfg = null, cfgTimer = null;
   let lastT = 0;
   function onMetrics(m) {
     if (m.history) Object.assign(history, structuredClone(m.history));
@@ -222,19 +247,27 @@ function overviewView(el) {
   }
   async function loadHistory() {
     try { const m = await client.api('/api/local/metrics?history=1'); onMetrics(m); } catch { paintMetrics(); }
-    try { const cfg = await client.api('/api/local/config'); limits.thermal = cfg?.performance?.thermalLimitC ?? null; } catch { /* offline */ }
+    try { cfg = await client.api('/api/local/config'); limits.thermal = cfg?.performance?.thermalLimitC ?? null; paintState(); } catch { /* offline */ }
   }
   async function activate(a) {
     try { await post(`/api/local/apps/${encodeURIComponent(a.id)}/activate`); toast(`${a.name} geöffnet`, { kind: 'ok', timeout: 1500 }); } catch (error) { toast(error.message, { kind: 'err' }); }
   }
-  const offs = [client.on('state', paintState), client.on('connection', ({ connected }) => { paintState(); if (connected) loadHistory(); }), client.on('metrics', onMetrics)];
+  // Metrics stream only while this view is on screen and the tab is visible.
+  const streamSync = () => client.setMetrics(!document.hidden);
+  document.addEventListener('visibilitychange', streamSync);
+  streamSync();
+  const offs = [
+    client.on('state', () => { paintState(); clearTimeout(cfgTimer); cfgTimer = setTimeout(() => client.api('/api/local/config').then(next => { cfg = next; limits.thermal = next?.performance?.thermalLimitC ?? limits.thermal; paintState(); }).catch(() => {}), 800); }),
+    client.on('connection', ({ connected }) => { paintState(); if (connected) loadHistory(); }),
+    client.on('metrics', onMetrics),
+  ];
   // Fallback when the stream carries no metrics: poll.
   const poll = setInterval(() => { if (!document.hidden && client.connected && Date.now() - (client.metrics?.t || 0) > 5000) client.api('/api/local/metrics').then(onMetrics).catch(() => {}); }, 2000);
   const tick = setInterval(() => { paintStatus(); paintActions(); }, 30000);
   const resize = new ResizeObserver(() => Object.values(charts).forEach(c => c.redraw()));
   resize.observe(el);
   paintState(); loadHistory();
-  return { destroy() { offs.forEach(off => off()); clearInterval(poll); clearInterval(tick); resize.disconnect(); } };
+  return { destroy() { offs.forEach(off => off()); clearInterval(poll); clearInterval(tick); clearTimeout(cfgTimer); resize.disconnect(); document.removeEventListener('visibilitychange', streamSync); client.setMetrics(false); } };
 }
 const appName = id => (client.state?.apps || []).find(a => a.id === id)?.name || id;
 const appIcon = id => (client.state?.apps || []).find(a => a.id === id)?.icon;

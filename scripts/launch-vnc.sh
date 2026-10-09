@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib-common.sh"
 export DISPLAY=:0 XAUTHORITY="$HOME/.Xauthority"
-root="$HOME/mega-display/vendor/vnc/root"
+root="$OPENBOARD_BASE/vendor/vnc/root"
 export LD_LIBRARY_PATH="$root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 # Only SSH-tunnel clients and local processes can access this socket.
 vnc=$(command -v x11vnc || true)

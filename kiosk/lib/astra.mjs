@@ -1,8 +1,23 @@
 // Server-side bridge to ASTRA's display API v1. The browser never sees the token.
 import { EventEmitter } from 'node:events';
+import dns from 'node:dns/promises';
+import net from 'node:net';
 import { HttpError } from './router.mjs';
 
 const GLANCE_TTL = 10 * 60000;
+const IMAGE_LIMIT = 8 * 1024 * 1024;
+
+export function isPrivateAddress(address) {
+  if (net.isIPv4(address)) {
+    const [a, b] = address.split('.').map(Number);
+    return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127) || a >= 224;
+  }
+  if (net.isIPv6(address)) {
+    const lower = address.toLowerCase();
+    return lower === '::1' || lower === '::' || lower.startsWith('fc') || lower.startsWith('fd') || lower.startsWith('fe80') || lower.startsWith('::ffff:');
+  }
+  return true;
+}
 
 export function parseSse(buffer, onEvent) {
   // Returns the unparsed remainder. Events are separated by a blank line.
@@ -60,6 +75,7 @@ export class AstraBridge extends EventEmitter {
   async message(body) {
     const result = await this.request('display/v1/message', { method: 'POST', body, timeout: 120000 });
     this.glanceCache = null;
+    await this.inlineImages(result?.cards);
     return result;
   }
 
@@ -72,6 +88,32 @@ export class AstraBridge extends EventEmitter {
   }
 
   cachedGlance() { return this.glanceCache?.data || null; }
+
+  // Cards may carry https image URLs; the app's CSP only allows data: images, so they are fetched here.
+  // Only public hosts are fetched (a model-written URL must not probe the home network); the ASTRA host
+  // itself is allowed. Failures leave the card as is (the app shows a placeholder).
+  async inlineImages(cards) {
+    if (!Array.isArray(cards)) return cards;
+    const astraHost = this.configured ? new URL(this.settings.url).hostname : null;
+    await Promise.all(cards.map(async card => {
+      const src = card?.type === 'image' ? card.data?.src : null;
+      if (typeof src !== 'string' || !/^https?:\/\//i.test(src)) return;
+      try {
+        const url = new URL(src);
+        if (url.hostname !== astraHost) {
+          const addresses = await dns.lookup(url.hostname, { all: true });
+          if (!addresses.length || addresses.some(entry => isPrivateAddress(entry.address))) return;
+        }
+        const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(15000), headers: url.hostname === astraHost ? { authorization: `Bearer ${this.settings.token}` } : {} });
+        const type = response.headers.get('content-type')?.split(';')[0].trim() || '';
+        if (!response.ok || !/^image\/(png|jpe?g|webp|gif|avif)$/.test(type)) return;
+        const bytes = Buffer.from(await response.arrayBuffer());
+        if (bytes.length > IMAGE_LIMIT) return;
+        card.data = { ...card.data, src: `data:${type};base64,${bytes.toString('base64')}` };
+      } catch { /* keep the original card */ }
+    }));
+    return cards;
+  }
 
   tts(text) { return this.request('display/v1/tts', { method: 'POST', body: { text: String(text).slice(0, 4000) }, timeout: 60000 }); }
 
@@ -114,7 +156,12 @@ export class AstraBridge extends EventEmitter {
         let watchdog = setTimeout(() => controller.abort(), 60000);
         for await (const chunk of response.body) {
           clearTimeout(watchdog); watchdog = setTimeout(() => controller.abort(), 60000);
-          buffer = parseSse(buffer + decoder.decode(chunk, { stream: true }), (type, data) => { if (type !== 'ping') this.emit('event', type, data); });
+          buffer = parseSse(buffer + decoder.decode(chunk, { stream: true }), (type, data) => {
+            if (type === 'ping') return;
+            const cards = type === 'card' ? [data.card] : type === 'cards' ? data.cards : type === 'alarm' ? data.cards : null;
+            if (cards?.some(card => card?.type === 'image')) void this.inlineImages(cards).finally(() => this.emit('event', type, data));
+            else this.emit('event', type, data);
+          });
         }
         clearTimeout(watchdog);
       } catch (error) {

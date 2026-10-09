@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useStore } from './store.js';
 import { icon } from './icons.js';
-import { SWATCHES, PEN_WIDTHS, displayColor } from './colors.js';
+import { SWATCHES, HL_SWATCHES, PEN_WIDTHS, displayColor } from './colors.js';
 
 const Icon = ({ name }) => <span className="ic" dangerouslySetInnerHTML={{ __html: icon(name) }} />;
 
@@ -51,7 +51,7 @@ function clock(ms) {
   return `${d.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' })}, ${time}`;
 }
 
-function Popover({ anchor, children, wide }) {
+function Popover({ anchor, children, wide, seg }) {
   const ref = useRef(null);
   const [left, setLeft] = useState(null);
   useLayoutEffect(() => {
@@ -65,7 +65,7 @@ function Popover({ anchor, children, wide }) {
     setLeft(x - t.left);
   }, [anchor]);
   return (
-    <div ref={ref} className={`tb-pop ob-glass strong${wide ? ' wide' : ''}`} style={{ left: left ?? 0, opacity: left === null ? 0 : 1 }} role="dialog">
+    <div ref={ref} className={`tb-pop ob-glass strong${wide ? ' wide' : ''}${seg ? ' seg' : ''}`} style={{ left: left ?? 0, opacity: left === null ? 0 : 1 }} role="dialog">
       {children}
     </div>
   );
@@ -78,15 +78,15 @@ function ColorPanel({ c, s }) {
     <Popover anchor="color">
       <div className="pop-label">{highlighter ? 'Textmarker' : 'Farbe'}</div>
       <div className="swatches">
-        {SWATCHES.map(sw => (
+        {(highlighter ? HL_SWATCHES : SWATCHES).map(sw => (
           <button key={sw.id} type="button" className="swatch" aria-label={sw.label} title={sw.label}
             aria-pressed={current === sw.color} onClick={() => c.setColor(sw.color)}>
             <i style={{ background: displayColor(sw.color, s.paper) }} />
           </button>
         ))}
       </div>
-      <div className="pop-label">Strichstärke</div>
-      <div className="widths">
+      {!highlighter && <div className="pop-label">Strichstärke</div>}
+      {!highlighter && <div className="widths">
         {PEN_WIDTHS.map(w => (
           <button key={w.id} type="button" className="width" aria-label={w.label} title={w.label}
             aria-pressed={!highlighter && s.width === w.id} onClick={() => c.setWidth(w.id)}>
@@ -94,7 +94,7 @@ function ColorPanel({ c, s }) {
             <span>{w.label}</span>
           </button>
         ))}
-      </div>
+      </div>}
     </Popover>
   );
 }
@@ -246,7 +246,7 @@ export function Toolbar({ c }) {
         <Tool id="select" name={s.selectMode === 'lasso' ? 'lasso' : 'select'} label="Auswählen" pressed={s.tool === 'select' || s.tool === 'lasso'}
           onClick={() => (s.tool === 'select' || s.tool === 'lasso' ? toggle('select') : c.setTool(s.selectMode === 'lasso' ? 'lasso' : 'select'))} />
         <Tool id="shape" name={shapeIcon} label="Formen" pressed={s.tool === 'shape'}
-          onClick={() => (s.tool === 'shape' ? toggle('shape') : c.setTool('shape'))} />
+          onClick={() => (s.tool === 'shape' ? toggle('shape') : c.setTool('shape', { popover: 'shape' }))} />
         <Tool id="text" name="text" label="Text" pressed={s.tool === 'text'} onClick={() => c.setTool('text')} />
         <Tool id="sticky" name="sticky" label="Notiz" pressed={s.tool === 'sticky'} onClick={() => c.setTool('sticky')} />
         <span className="tb-sep" />
@@ -260,9 +260,15 @@ export function Toolbar({ c }) {
         <Tool id="collapse" name="collapse" label="Werkzeugleiste ausblenden" onClick={() => c.store.set({ collapsed: true, popover: null, sheet: null })} />
       </div>
 
+      {s.hasSelection && s.tool === 'select' && !s.popover && !s.sheet && (
+        <div className="tb-sel ob-glass" role="toolbar" aria-label="Auswahl">
+          <button type="button" className="pill" onClick={() => c.selectionAction('duplicate')}><Icon name="duplicate" />Duplizieren</button>
+          <button type="button" className="pill danger-text" onClick={() => c.selectionAction('delete')}><Icon name="trash" />Löschen</button>
+        </div>
+      )}
       {s.popover === 'color' && <ColorPanel c={c} s={s} />}
       {s.popover === 'shape' && (
-        <Popover anchor="shape">
+        <Popover anchor="shape" seg>
           <div className="seg-row">
             {SHAPE_ITEMS.map(item => (
               <Tool key={item.id} name={item.icon} label={item.label} pressed={s.shape === item.id}

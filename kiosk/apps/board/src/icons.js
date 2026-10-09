@@ -24,6 +24,7 @@ const own = {
   file: '<path d="M7 3.5h7l4.5 4.5v12.5H7z"/><path d="M14 3.5V8h4.5"/>',
   vector: '<path d="M6 18c2-8 10-4 12-12"/><rect x="3.5" y="15.5" width="5" height="5" rx="1"/><rect x="15.5" y="3.5" width="5" height="5" rx="1"/>',
   clear: '<path d="M4 20h16"/><path d="m6 16 9.5-9.5 3 3L9 19H6v-3Z" opacity=".5"/><path d="M14 3l1.2 2.4L17.6 6.6 15.2 7.8 14 10.2 12.8 7.8 10.4 6.6 12.8 5.4Z"/>',
+  duplicate: '<rect x="8.5" y="8.5" width="11.5" height="11.5" rx="2.5"/><path d="M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"/>',
   boards: '<rect x="3" y="5" width="13" height="10" rx="2"/><path d="M8 19h11a2 2 0 0 0 2-2V9"/>',
 };
 

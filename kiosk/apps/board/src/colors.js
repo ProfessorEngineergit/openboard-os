@@ -2,26 +2,41 @@
 // on dark paper Excalidraw renders the canvas through `invert(93%) hue-rotate(180deg)`.
 // displayColor() applies the same transform so swatches and the ink layer match the
 // rendered result exactly.
+// Mid-luminance hues only: after the dark-paper filter they stay vivid (light yellows and oranges would
+// turn into muddy browns), on light paper they keep a contrast of >= 3:1.
 export const SWATCHES = [
   { id: 'ink', label: 'Tinte', color: '#1e1e1e' },
   { id: 'blue', label: 'Blau', color: '#1971c2' },
   { id: 'red', label: 'Rot', color: '#e03131' },
   { id: 'green', label: 'Grün', color: '#2f9e44' },
-  { id: 'orange', label: 'Orange', color: '#f08c00' },
+  { id: 'orange', label: 'Orange', color: '#e8590c' },
   { id: 'violet', label: 'Violett', color: '#7048e8' },
   { id: 'teal', label: 'Türkis', color: '#0c8599' },
-  { id: 'yellow', label: 'Gelb', color: '#fcc419' },
+  { id: 'pink', label: 'Pink', color: '#c2255c' },
+];
+
+// Marker colors (drawn at 45 % opacity). Warm hues first; on dark paper every translucent color is
+// dimmer than on white because the whole canvas is inverted.
+export const HL_SWATCHES = [
+  { id: 'yellow', label: 'Gelb', color: '#f59f00' },
+  { id: 'orange', label: 'Orange', color: '#e8590c' },
+  { id: 'pink', label: 'Pink', color: '#c2255c' },
+  { id: 'violet', label: 'Violett', color: '#7048e8' },
+  { id: 'blue', label: 'Blau', color: '#1971c2' },
+  { id: 'teal', label: 'Türkis', color: '#0c8599' },
+  { id: 'green', label: 'Grün', color: '#2f9e44' },
+  { id: 'ink', label: 'Grau', color: '#868e96' },
 ];
 
 export const STICKY_COLORS = { fill: '#ffec99', stroke: '#f2c94c' };
 
 // Pen widths (Excalidraw strokeWidth; rendered diameter ≈ 6 × strokeWidth at medium pressure).
 export const PEN_WIDTHS = [
-  { id: 's', label: 'Fein', stroke: 0.6, shape: 1 },
-  { id: 'm', label: 'Mittel', stroke: 1.2, shape: 2 },
-  { id: 'l', label: 'Dick', stroke: 2.6, shape: 4 },
+  { id: 's', label: 'Fein', stroke: 0.6, shape: 1.5 },
+  { id: 'm', label: 'Mittel', stroke: 1.2, shape: 3 },
+  { id: 'l', label: 'Dick', stroke: 2.6, shape: 5 },
 ];
-export const HIGHLIGHTER = { stroke: 4.5, opacity: 38 };
+export const HIGHLIGHTER = { stroke: 4.5, opacity: 45 };
 
 // Paper follows the system theme unless config.board.paper forces light/dark.
 export function paperTheme(systemTheme, paper = 'auto') {

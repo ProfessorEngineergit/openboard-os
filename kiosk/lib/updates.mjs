@@ -62,6 +62,6 @@ export class Updates {
   }
 
   async check() {
-    await run('systemctl', ['--user', 'start', '--no-block', 'openboard-update.service'], { timeout: 10000 });
+    await run('systemctl', ['--user', 'start', '--no-block', 'openboard-update-now.service'], { timeout: 10000 });
   }
 }

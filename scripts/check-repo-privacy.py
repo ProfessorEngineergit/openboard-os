@@ -10,8 +10,10 @@ files = [name for name in files if name]
 if not files:
     raise SystemExit('No tracked files to check; stage the source files first.')
 blocked_prefixes = ('logs/', 'backups/', 'kiosk/data/', 'gods-eye-view/', 'vendor/', 'remote/novnc/')
+# Generated third-party bundles (minified) contain random strings that look like keys.
+generated_prefixes = ('kiosk/apps/board/dist/', 'kiosk/vendor/liquid-glass/glass-runtime.js', 'kiosk/ui/fonts/')
 blocked_names = {'kiosk/config.json', 'kiosk/api-token', '.env'}
-public_images = {'docs/screenshots/glass-panel.png', 'docs/screenshots/launcher.png', 'docs/screenshots/whiteboard.png'}
+public_images = {'docs/screenshots/dock.png', 'docs/screenshots/astra.png', 'docs/screenshots/board.png', 'docs/screenshots/settings.png'}
 patterns = {
     'provider key': re.compile(r'(?:AIza[\w-]{30,}|sk-[\w-]{20,}|gh[pousr]_[A-Za-z0-9]{20,})'),
     'private key': re.compile(r'BEGIN [A-Z ]*PRIVATE KEY'),
@@ -23,6 +25,8 @@ errors = []
 for name in files:
     if name.startswith(blocked_prefixes) or name in blocked_names or name.startswith('.env.'):
         errors.append((name, 'runtime/private file'))
+        continue
+    if name.startswith(generated_prefixes):
         continue
     # Inspect the exact index content that will be committed, not the working copy.
     raw = subprocess.check_output(['git', 'show', ':' + name])
