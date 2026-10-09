@@ -8,6 +8,7 @@ Touch-Kiosk für Ubuntu mit X11: God’s Eye View, Home Assistant, eine eigene A
 - Transparenter Liquid-Glass-Look mit dem originalen WebGL-Backend von `@tomagranate/liquid-glass`.
 - Das aufgeklappte App-Panel bleibt oben links und lässt sich nicht verschieben.
 - Vier vorgeladene App-Tabs im selben Vollbildfenster. Ein Wechsel aktiviert den vorhandenen Tab.
+- Zusätzliche Home-Assistant-Fenster erhalten ebenfalls den Switcher; eingebettete Frames bekommen kein zweites Overlay.
 - Home Assistant wird auf 75 % skaliert; der App-Switcher behält seine Touch-Größe.
 - Der Cursor wird auf X11 und in den App-Seiten ausgeblendet.
 - Whiteboard mit Stift, Radierer, Farben, Undo/Redo, PNG-Export und lokaler Speicherung.
@@ -91,6 +92,7 @@ Die Browser-Prüfer laufen innerhalb des Controllers, weil Firefox nur eine WebD
 - `node kiosk/server.mjs --verify-startup`: App-Bereitschaft, bestehendes Kiosk-Fenster und Netzwerkwiederherstellung.
 - `node kiosk/server.mjs --verify-updates`: vorhandene Tabs, Vollbild, Skalierung und Glass-Renderer.
 - `node kiosk/server.mjs --verify-dock`: kleiner Knopf, Verschieben und festes Panel.
+- `node kiosk/server.mjs --verify-overlays`: vorhandene zusätzliche Home-Assistant-Fenster und ihre App-Knöpfe prüfen, ohne die Seiten neu zu laden.
 - `node kiosk/server.mjs --verify`: vollständiger Funktionstest, der auch einen Whiteboard-Teststrich zeichnet.
 
 Die vollständige Prüfung nur mit entbehrlichen Testzeichnungen ausführen. Prüfberichte und Bildschirmfotos bleiben unter `logs/` und werden nicht versioniert.

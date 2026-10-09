@@ -31,6 +31,7 @@ try { token = (await readFile(tokenPath, 'utf8')).trim(); } catch {
 }
 let browser, active = 'gev', voice, voicePage, connectPromise;
 const pages = new Map(), opening = new Map(), installed = new WeakSet();
+const attachedPages = new Map();
 const recovering = new Set();
 const tools = createActionTools();
 const toolNames = new Set(tools.map(tool => tool.name));
@@ -41,7 +42,7 @@ function state(current = active) {
     tabs: config.tabs.map(tab => ({ ...tab, active: tab.id === active, open: pages.has(tab.id) })) };
 }
 async function publish() {
-  await Promise.allSettled([...pages].map(([id, page]) => page.evaluate(next => window.__megaKioskUpdate?.(next), state(id))));
+  await Promise.allSettled([...attachedPages].map(([page, id]) => page.evaluate(next => window.__megaKioskUpdate?.(next), state(id))));
 }
 async function voiceEvent(message) {
   if (voicePage && !voicePage.isClosed()) await voicePage.evaluate(value => window.__megaKioskVoice?.(value), message).catch(() => {});
@@ -101,6 +102,7 @@ async function runTool(name, args = {}) {
 }
 async function installPage(page, id) {
   if (installed.has(page)) return; installed.add(page);
+  attachedPages.set(page, id);
   await page.exposeFunction('megaKiosk', async raw => {
     try {
       if (typeof raw !== 'string' || raw.length > 50000) return;
@@ -123,7 +125,7 @@ async function installPage(page, id) {
   await page.evaluateOnNewDocument(overlay);
   await page.evaluate(overlay).catch(() => {});
   page.on('domcontentloaded', () => { void publish(); });
-  page.on('close', () => { if (pages.get(id) === page) pages.delete(id); });
+  page.on('close', () => { attachedPages.delete(page); if (pages.get(id) === page) pages.delete(id); });
   // The existing GEV render governor suspends hidden tabs. Cap its visible
   // frame rate on this Intel HD 630 without changing upstream source.
   if (id === 'gev') {
@@ -168,6 +170,19 @@ async function installPage(page, id) {
     await page.evaluate(scaleHome);
   }
 }
+async function attachKnownPages() {
+  const known = [...config.tabs].sort((a, b) => b.url.length - a.url.length);
+  for (const page of await browser.pages()) {
+    if (page.isClosed() || installed.has(page)) continue;
+    if (!await page.evaluate(() => window.top === window).catch(() => false)) continue;
+    const url = page.url();
+    const tab = known.find(tab => url.startsWith(tab.url)) || known.find(tab => {
+      if (tab.id !== 'home') return false;
+      try { return new URL(url).origin === new URL(tab.url).origin; } catch { return false; }
+    });
+    if (tab) await installPage(page, tab.id);
+  }
+}
 async function connect() {
   if (browser?.connected) return;
   if (connectPromise) return connectPromise;
@@ -178,7 +193,7 @@ async function connect() {
       browser = await puppeteer.connect({ browserWSEndpoint: 'ws://127.0.0.1:9222/session', protocol: 'webDriverBiDi', defaultViewport: null });
     }
     await browser.defaultBrowserContext().overridePermissions('http://localhost:4173', ['microphone']).catch(() => {});
-    browser.on('disconnected', () => { pages.clear(); opening.clear(); void stopVoice(); });
+    browser.on('disconnected', () => { pages.clear(); attachedPages.clear(); opening.clear(); void stopVoice(); });
     const existing = await browser.pages();
     for (const tab of config.tabs) {
       const page = existing.find(page => page.url().startsWith(tab.url));
@@ -194,6 +209,7 @@ async function connect() {
     // Firefox can focus a page during navigation even if its tab was created in
     // the background. Return to the current choice once the warm-up finishes.
     if (needsPreload) await activate(active);
+    await attachKnownPages(); await publish();
   })().finally(() => { connectPromise = null; });
   return connectPromise;
 }
@@ -341,22 +357,24 @@ async function shutdown() {
 }
 process.on('SIGTERM', () => { void shutdown(); });
 process.on('SIGINT', () => { void shutdown(); });
-if (['--verify','--verify-updates','--verify-startup','--verify-dock'].some(flag => process.argv.includes(flag))) {
+if (['--verify','--verify-updates','--verify-startup','--verify-dock','--verify-overlays'].some(flag => process.argv.includes(flag))) {
   for (let attempt = 0; attempt < 30; attempt++) {
     try { await connect(); break; } catch (error) { console.error(error.message); await delay(1000); }
   }
-  const verify = process.argv.includes('--verify-dock')
+  const verify = process.argv.includes('--verify-overlays')
+    ? (await import('../scripts/verify-overlays.mjs')).verifyOverlays
+    : process.argv.includes('--verify-dock')
     ? (await import('../scripts/verify-dock.mjs')).verifyDock
     : process.argv.includes('--verify-startup')
     ? (await import('../scripts/verify-startup.mjs')).verifyStartup
     : process.argv.includes('--verify-updates')
     ? (await import('../scripts/verify-updates.mjs')).verifyUpdates
     : (await import('../scripts/verify-kiosk.mjs')).verify;
-  try { await verify(browser, recoverFailedPage); } finally { await shutdown(); }
+  try { await verify(browser, recoverFailedPage, attachKnownPages); } finally { await shutdown(); }
 } else
 for (let cycle = 0;; cycle++) {
   try { await connect(); } catch { /* Browser may start after the service. */ }
-  if (browser?.connected) await publish();
+  if (browser?.connected) { await attachKnownPages(); await publish(); }
   if (browser?.connected && cycle % 5 === 0) await recoverFailedPages();
   await delay(3000);
 }
