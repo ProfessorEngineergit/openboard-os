@@ -25,7 +25,9 @@ await mkdir(out, { recursive: true });
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const children = [];
 const results = [];
+const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
 const step = async (name, fn) => {
+  if (only && !name.includes(only)) return;
   try { await fn(); results.push(['ok', name]); console.log(`✓ ${name}`); }
   catch (error) { results.push(['fail', name, error.message]); console.log(`✗ ${name}: ${error.message}`); }
 };
@@ -56,6 +58,8 @@ await writeFile(`${work}/config.json`, JSON.stringify({
   ],
   astra: { url: 'http://127.0.0.1:18088', token: 'dev', voice: true, briefingOnDisplay: true },
   performance: { prewarm: false },
+  // Headless Chromium renders WebGL in software; keep the dock open long enough to inspect.
+  dock: { autoHideSeconds: 90 },
 }));
 await sleep(1500);
 const controller = spawn(process.execPath, [resolve(repo, 'kiosk/server.mjs')], {

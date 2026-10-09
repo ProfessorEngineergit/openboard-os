@@ -15,7 +15,7 @@ export function defaults() {
     version: 2,
     apps: structuredClone(BUILTIN_APPS),
     startApp: 'gev',
-    appearance: { theme: 'dark', lightFrom: '07:00', darkFrom: '19:30', glass: 'webgl', accent: '#f4f5f8' },
+    appearance: { theme: 'dark', lightFrom: '07:00', darkFrom: '19:30', glass: 'webgl', frost: 0.55, accent: '#f4f5f8' },
     dock: {
       order: BUILTIN_APPS.map(app => app.id), autoHideSeconds: 6, indicator: 'touch',
       tiles: [
@@ -117,6 +117,7 @@ export function validate(config) {
   config.dock.order = [...new Set([...config.dock.order.filter(id => ids.has(id)), ...ids])];
   oneOf(config.appearance.theme, ['dark', 'light', 'auto'], 'Design');
   oneOf(config.appearance.glass, ['webgl', 'css', 'off'], 'Glas');
+  number(config.appearance.frost, 0, 1, 'Milchglas-Stärke');
   if (!TIME.test(config.appearance.lightFrom) || !TIME.test(config.appearance.darkFrom)) throw new Error('Uhrzeit im Format HH:MM');
   oneOf(config.dock.indicator, ['always', 'touch', 'never'], 'Indikator');
   number(config.dock.autoHideSeconds, 2, 120, 'Ausblenden nach');

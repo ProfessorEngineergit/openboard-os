@@ -230,15 +230,27 @@ const mount = () => {
     if (performance.now() - lastActivity > 5000) { lastActivity = performance.now(); void bridge('activity'); }
     if (root.classList.contains('asleep')) return;
     if (event.clientY > innerHeight - 140) showIndicator();
-    if (event.clientY >= innerHeight - EDGE_PX && event.isPrimary) swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, t: performance.now() };
+    // Fingers are tracked with touch events below: on scrollable pages the
+    // browser cancels pointer events as soon as it starts panning.
+    if (event.pointerType !== 'touch' && event.clientY >= innerHeight - EDGE_PX && event.isPrimary) swipe = { id: event.pointerId, x: event.clientX, y: event.clientY };
     if (isOpen() && !event.composedPath().includes(host)) close();
   }, true);
-  on(window, 'pointermove', event => {
-    if (!swipe || swipe.id !== event.pointerId) return;
-    const dy = swipe.y - event.clientY, dx = Math.abs(event.clientX - swipe.x);
-    if (dy > 36 && dy > dx * 1.2) { swipe = null; open(); }
-  }, true);
+  const gesture = { starts: 0, moves: 0, opens: 0 };
+  const swipeMove = (id, x, y) => {
+    if (!swipe || swipe.id !== id) return;
+    gesture.moves++;
+    const dy = swipe.y - y, dx = Math.abs(x - swipe.x);
+    if (dy > 36 && dy > dx * 1.2) { swipe = null; gesture.opens++; open(); }
+  };
+  on(window, 'pointermove', event => swipeMove(event.pointerId, event.clientX, event.clientY), true);
   for (const name of ['pointerup', 'pointercancel']) on(window, name, event => { if (swipe?.id === event.pointerId) swipe = null; }, true);
+  on(window, 'touchstart', event => {
+    const touch = event.changedTouches[0];
+    gesture.starts++;
+    if (event.touches.length === 1 && touch.clientY >= innerHeight - EDGE_PX && !root.classList.contains('asleep')) swipe = { id: `t${touch.identifier}`, x: touch.clientX, y: touch.clientY };
+  }, { capture: true, passive: true });
+  on(window, 'touchmove', event => { for (const touch of event.changedTouches) swipeMove(`t${touch.identifier}`, touch.clientX, touch.clientY); }, { capture: true, passive: true });
+  for (const name of ['touchend', 'touchcancel']) on(window, name, () => { if (typeof swipe?.id === 'string') swipe = null; }, { capture: true, passive: true });
   on(dock, 'pointerdown', () => cancel(hideTimer));
   on(row, 'pointerup', scheduleHide);
 
@@ -634,7 +646,14 @@ const mount = () => {
   // One renderer for the whole dock row: each tile and the dock are shapes.
   const glass = { renderer: null, error: '', frames: 0, last: 0, lastDom: 0, kind: '', unbind: null, timer: null };
   const lens = $('lens');
-  const material = { ior: 1.5, dispersion: 0.035, bevel: 18, height: 22, refractScale: 2.4, meniscus: 1, blurPlateau: 2.5, blurRim: 1, specular: 0.36, fresnel: 1, saturation: 1.18, tintAmount: 0.025, tintColor: [0.10, 0.15, 0.21], tintAdapt: 0, shadow: 0, edgeLine: 0.22 };
+  // Frost = background blur + a little tint, so the page behind stays visible but
+  // calm. Refraction (ior, bevel, height, refractScale, meniscus) is independent of it.
+  const frostOf = () => Math.max(0, Math.min(1, state?.appearance?.frost ?? 0.55));
+  const materialFor = frost => ({ ior: 1.5, dispersion: 0.035, bevel: 18, height: 22, refractScale: 2.4, meniscus: 1,
+    blurPlateau: 2.5 + frost * 15, blurRim: 1 + frost * 12, specular: 0.36, fresnel: 1, saturation: 1.18 + frost * 0.22,
+    tintAmount: 0.025 + frost * 0.13, tintColor: root.dataset.obTheme === 'light' ? [0.93, 0.95, 0.98] : [0.10, 0.15, 0.21],
+    tintAdapt: 0, shadow: 0, edgeLine: 0.22 });
+  let appliedFrost = null;
   const crop = document.createElement('canvas'), cropContext = crop.getContext('2d');
   const glassMode = () => state?.appearance?.glass || 'webgl';
   function paintGlass(force = false) {
@@ -647,7 +666,8 @@ const mount = () => {
       const margin = 48, cw = Math.round(rowBox.width + margin * 2), ch = Math.round(rowBox.height + margin * 2);
       if (!rowBox.width) return;
       lens.style.cssText = `left:-${margin}px;top:-${margin}px;width:${cw}px;height:${ch}px`;
-      if (!glass.renderer) glass.renderer = new MegaGlass.WebGLGlass(lens, { compositeMode: 'overlay', material });
+      if (!glass.renderer) glass.renderer = new MegaGlass.WebGLGlass(lens, { compositeMode: 'overlay', material: materialFor(frostOf()) });
+      appliedFrost = `${frostOf()}|${root.dataset.obTheme}`;
       if (crop.width !== cw || crop.height !== ch) { crop.width = cw; crop.height = ch; }
       const shapes = surfaces.map((element, index) => {
         const box = element.getBoundingClientRect();
@@ -676,6 +696,8 @@ const mount = () => {
         MegaGlass.paintPageContent(cropContext, region, null);
         cropContext.setTransform(1, 0, 0, 1, 0, 0);
       }
+      const frostKey = `${frostOf()}|${root.dataset.obTheme}`;
+      if (frostKey !== appliedFrost) { glass.renderer.setMaterial(materialFor(frostOf()), false); appliedFrost = frostKey; }
       glass.renderer.setBackdrop(crop, { update: 'live', autoStart: false, shouldRender: false });
       glass.renderer.render({ dpr: 1 }); glass.frames++; glass.error = '';
     } catch (error) { glass.error = error.message; }
@@ -762,6 +784,7 @@ const mount = () => {
   const update = next => {
     state = next;
     root.dataset.obTheme = next.theme || 'dark';
+    root.style.setProperty('--ob-glass-blur', `${Math.round(8 + frostOf() * 28)}px`);
     root.classList.toggle('indicator-never', next.dock?.indicator === 'never');
     indicator.classList.toggle('show', next.dock?.indicator === 'always');
     setAsleep(!!next.display?.asleep);
@@ -786,7 +809,7 @@ const mount = () => {
     diagnostics: () => ({ version: SHELL_VERSION, open: isOpen(), editing, asleep: root.classList.contains('asleep'), apps: dock.querySelectorAll('[data-app]').length,
       tiles: tilesEl.children.length, keyboard: keyboard.classList.contains('show'), voice: !!voiceSession,
       dock: JSON.parse(JSON.stringify(dock.getBoundingClientRect())), indicator: JSON.parse(JSON.stringify(indicator.getBoundingClientRect())),
-      glassFrames: glass.frames, glassError: glass.error, glassEngine: typeof MegaGlass !== 'undefined' ? MegaGlass.IOR_RENDERER : null, backdropKind: glass.kind }),
+      gesture: { ...gesture }, glassFrames: glass.frames, glassError: glass.error, glassEngine: typeof MegaGlass !== 'undefined' ? MegaGlass.IOR_RENDERER : null, backdropKind: glass.kind }),
     open, close, openEditor, closeEditor,
   };
   window.__megaKiosk = true; // legacy marker for older tooling
