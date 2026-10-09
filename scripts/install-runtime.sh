@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/lib-common.sh"
 mkdir -p "$HOME/.local/opt"
 cd "$HOME/.local/opt"
 wget -q https://nodejs.org/dist/latest-v24.x/SHASUMS256.txt -O node-shasums.txt
@@ -12,6 +13,6 @@ ln -sfn "${node_archive%.tar.xz}" node
 export PATH="$HOME/.local/opt/node/bin:$PATH"
 node --version
 npm --version
-cd "$HOME/mega-display/gods-eye-view"
+cd "$OPENBOARD_BASE/gods-eye-view"
 PUPPETEER_SKIP_DOWNLOAD=true npm ci --no-audit --no-fund
 npm run doctor

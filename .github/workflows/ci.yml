@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: kiosk/package-lock.json
+      - name: Install
+        working-directory: kiosk
+        run: PUPPETEER_SKIP_DOWNLOAD=true npm ci --no-audit --no-fund
+      - name: Syntax check
+        run: |
+          set -e
+          for f in $(git ls-files '*.mjs' ':!:kiosk/apps/board/dist/*' ':!:kiosk/vendor/*'); do node --check "$f"; done
+          for f in $(git ls-files 'scripts/*.sh'); do bash -n "$f"; done
+          python3 -m py_compile scripts/reconnect-display.py scripts/hide-cursor.py scripts/wait-kiosk-ready.py
+      - name: Unit tests
+        working-directory: kiosk
+        run: npm test
+      - name: Update script (rollback paths)
+        run: bash scripts/dev/test-update.sh
+      - name: Repository privacy check
+        run: python3 scripts/check-repo-privacy.py

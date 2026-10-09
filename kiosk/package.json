@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test lib/*.test.mjs",
-    "verify": "node server.mjs --verify"
+    "verify": "node server.mjs --verify",
+    "test:update": "bash ../scripts/dev/test-update.sh",
+    "e2e": "node ../scripts/dev/e2e.mjs"
   },
   "dependencies": {
     "mqtt": "5.16.0",

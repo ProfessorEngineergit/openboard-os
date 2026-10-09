@@ -42,7 +42,7 @@ let config = {
     { id: 'settings', name: 'Einstellungen', url: 'http://localhost:4180/apps/settings/', icon: 'settings', builtin: true, enabled: true, zoom: 1, residency: 'eco', weight: 'light' },
   ],
   startApp: 'gev',
-  appearance: { theme: 'dark', lightFrom: '07:00', darkFrom: '19:30', glass: 'webgl', accent: '#f4f5f8' },
+  appearance: { theme: 'dark', lightFrom: '07:00', darkFrom: '19:30', glass: 'webgl', frost: 0.55, keyboardScale: 1, accent: '#f4f5f8' },
   dock: {
     order: ['gev', 'home', 'astra', 'board', 'settings'],
     autoHideSeconds: 6, indicator: 'touch',
@@ -51,9 +51,9 @@ let config = {
       { id: 't2', items: [{ id: 'w5', type: 'info.clock' }] },
     ],
   },
-  display: { sleepMode: 'black', useDdc: true, idleSleepMinutes: 0, schedule: { enabled: false, sleepAt: '23:30', wakeAt: '06:45' } },
+  display: { orientation: 'landscape', sleepMode: 'black', useDdc: true, idleSleepMinutes: 0, schedule: { enabled: false, sleepAt: '23:30', wakeAt: '06:45' } },
   performance: { mode: 'balanced', elevatedCpu: 75, criticalCpu: 92, sustainSeconds: 20, memoryFloorMB: 600, terminate: 'ask', askTimeoutSeconds: 30, askDefault: 'keep', terminateMinIdleMinutes: 20, freezeMinIdleMinutes: 3, prewarm: true, thermalLimitC: 88, gev: { fps: 30, resolutionScale: 0.8 } },
-  astra: { url: 'http://192.168.178.189:8088', token: 'astra-display-token', voice: true, briefingOnDisplay: true },
+  astra: { url: 'http://astra.local:8088', token: 'astra-display-token', voice: true, briefingOnDisplay: true },
   mqtt: { url: 'mqtt://homeassistant.local:1883', username: 'openboard', password: 'hunter2', discoveryPrefix: 'homeassistant', nodeId: 'openboard' },
   gemini: { key: '', model: 'gemini-3.8-live' },
   board: { paper: 'auto', lowLatency: true, prediction: true },
@@ -128,7 +128,7 @@ function effectiveTheme() {
 function state() {
   return {
     version: runtime.update.current, connected: true, active: runtime.active, theme: effectiveTheme(), startedAt,
-    display: clone(runtime.display),
+    display: { ...clone(runtime.display), orientation: config.display.orientation },
     apps: config.apps.map(app => ({ id: app.id, name: app.name, icon: app.icon, url: app.url, enabled: app.enabled !== false, builtin: !!app.builtin, custom: !!app.custom, residency: app.residency, ...appRuntime(app.id) })),
     dock: clone(config.dock), appearance: clone(config.appearance),
     pressure: runtime.pressure,

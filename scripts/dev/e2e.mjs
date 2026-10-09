@@ -285,6 +285,16 @@ try {
       await shot(page, name);
     });
   }
+  await step('npm run verify (live check script) passes against the running system', async () => {
+    controller.kill(); await sleep(1500);
+    const verifier = spawn(process.execPath, [resolve(repo, 'kiosk/server.mjs'), '--verify'], {
+      env: { ...process.env, OPENBOARD_PORT: String(PORT), OPENBOARD_DEBUG_PORT: String(DEBUG), OPENBOARD_CONFIG: `${work}/config.json`, OPENBOARD_DATA_DIR: `${work}/data`, OPENBOARD_TOKEN_FILE: `${work}/token`, OPENBOARD_STATE_DIR: `${work}/state` },
+      stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = ''; verifier.stdout.on('data', d => { output += d; }); verifier.stderr.on('data', d => { output += d; });
+    const code = await new Promise(resolveExit => { const timer = setTimeout(() => { verifier.kill(); resolveExit(-1); }, 90000); verifier.on('exit', c => { clearTimeout(timer); resolveExit(c); }); });
+    assert.equal(code, 0, output.slice(-1500));
+    assert(/Alle \d+ Prüfungen bestanden/.test(output), output.slice(-800));
+  });
 } finally {
   await browser.disconnect();
   if (!process.argv.includes('--keep')) { for (const child of children) child.kill(); stopFixtures(); }

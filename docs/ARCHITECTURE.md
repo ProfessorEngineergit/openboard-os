@@ -16,7 +16,7 @@ Leitlinien:
 | `openboard-control` | `kiosk/server.mjs`: Apps, Shell, API, Leistungsmanager, MQTT, ASTRA-Brücke (Port 4180, nur Loopback) |
 | `openboard-browser` | Chrome bzw. Firefox im Kiosk-Modus mit Debug-Port 9222 (nur Loopback) |
 | `openboard-remote` | `remote/server.mjs`: Konsole und VNC-Proxy (Port 6080, nur Loopback, Zugriff per SSH-Tunnel) |
-| `openboard-update.timer` | `scripts/update.sh`, jede Minute: Git-Update mit Rollback |
+| `openboard-update.timer` | `scripts/update.sh`, jede Minute: Git-Update mit Rollback (`openboard-update-now.service` für manuelles Prüfen) |
 | `openboard-gev` | God's Eye View (separater Upstream, Port 4173) |
 | `openboard-display` | Display- und Touch-Wächter (`scripts/reconnect-display.py`) |
 
@@ -196,7 +196,7 @@ Ziel: Solange Reserven da sind, wird nichts angefasst. Erst unter Last wird schr
 
 ## ASTRA-Display-Protokoll v1
 
-Der Controller spricht serverseitig mit ASTRA (`astra.url`, z. B. `http://192.168.178.189:8088`) und verwendet `Authorization: Bearer <astra.token>`. In ASTRA ist das `ASTRA_DISPLAY_TOKEN` bzw. der Token aus dem Admin-Bereich. Der Browser sieht den Token nie.
+Der Controller spricht serverseitig mit ASTRA (`astra.url`, z. B. `http://astra.local:8088`) und verwendet `Authorization: Bearer <astra.token>`. In ASTRA ist das `ASTRA_DISPLAY_TOKEN` bzw. der Token aus dem Admin-Bereich. Der Browser sieht den Token nie.
 
 | Methode | ASTRA-Pfad | Kiosk-Proxy |
 |---|---|---|
