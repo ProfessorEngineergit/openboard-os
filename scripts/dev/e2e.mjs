@@ -1,0 +1,252 @@
+// End-to-end test against a headless Chromium with fixture apps.
+//   node scripts/dev/e2e.mjs [--out DIR] [--keep]
+// Starts fixtures (GEV :4173, HA :8123), the ASTRA mock (:18088), Chromium (:9222)
+// and the controller (:4180) with a temporary config, then exercises the OS.
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
+import { existsSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
+import { startFixtures } from './fixtures.mjs';
+
+// Isolated ports so the test never collides with a running controller.
+const PORT = Number(process.env.OPENBOARD_PORT || 4280);
+const APP = `http://localhost:${PORT}`;
+const DEBUG = Number(process.env.OPENBOARD_DEBUG_PORT || 9333);
+
+const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const require = createRequire(resolve(repo, 'kiosk/package.json'));
+const { default: puppeteer } = await import(pathToFileURL(require.resolve('puppeteer')).href);
+const out = process.argv.includes('--out') ? resolve(process.argv[process.argv.indexOf('--out') + 1]) : await mkdtemp(resolve(tmpdir(), 'openboard-e2e-'));
+await mkdir(out, { recursive: true });
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const children = [];
+const results = [];
+const step = async (name, fn) => {
+  try { await fn(); results.push(['ok', name]); console.log(`✓ ${name}`); }
+  catch (error) { results.push(['fail', name, error.message]); console.log(`✗ ${name}: ${error.message}`); }
+};
+
+function chromiumPath() {
+  const base = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
+  const dir = readdirSync(base).find(name => /^chromium-\d+$/.test(name));
+  for (const candidate of [`${base}/${dir}/chrome-linux/chrome`, `${base}/${dir}/chrome-linux64/chrome`]) if (existsSync(candidate)) return candidate;
+  throw new Error('Chromium not found');
+}
+
+const stopFixtures = startFixtures();
+const work = await mkdtemp(resolve(tmpdir(), 'openboard-run-'));
+if (existsSync(resolve(repo, 'scripts/dev/mock-astra.mjs'))) {
+  children.push(spawn(process.execPath, [resolve(repo, 'scripts/dev/mock-astra.mjs'), '--port', '18088', '--token', 'dev'], { stdio: 'ignore' }));
+}
+const chrome = spawn(chromiumPath(), ['--headless=new', `--remote-debugging-port=${DEBUG}`, '--remote-debugging-address=127.0.0.1', `--user-data-dir=${work}/profile`,
+  '--window-size=1920,1080', '--no-first-run', '--disable-pinch', '--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore' });
+children.push(chrome);
+await writeFile(`${work}/config.json`, JSON.stringify({
+  version: 2,
+  apps: [
+    { id: 'gev', name: 'God’s Eye View', url: 'http://localhost:4173/', icon: 'globe', builtin: false, enabled: true, zoom: 1, residency: 'auto', weight: 'heavy' },
+    { id: 'home', name: 'Home Assistant', url: 'http://localhost:8123/', icon: 'home', builtin: false, enabled: true, zoom: 0.75, residency: 'always', weight: 'standard' },
+    { id: 'astra', name: 'Astra', url: `${APP}/apps/astra/`, icon: 'astra', builtin: true, enabled: true, zoom: 1, residency: 'always', weight: 'light' },
+    { id: 'board', name: 'Whiteboard', url: `${APP}/apps/board/`, icon: 'board', builtin: true, enabled: true, zoom: 1, residency: 'auto', weight: 'standard' },
+    { id: 'settings', name: 'Einstellungen', url: `${APP}/apps/settings/`, icon: 'settings', builtin: true, enabled: true, zoom: 1, residency: 'eco', weight: 'light' },
+  ],
+  astra: { url: 'http://127.0.0.1:18088', token: 'dev', voice: true, briefingOnDisplay: true },
+  performance: { prewarm: false },
+}));
+await sleep(1500);
+const controller = spawn(process.execPath, [resolve(repo, 'kiosk/server.mjs')], {
+  env: { ...process.env, OPENBOARD_PORT: String(PORT), OPENBOARD_DEBUG_PORT: String(DEBUG), OPENBOARD_CONFIG: `${work}/config.json`, OPENBOARD_DATA_DIR: `${work}/data`, OPENBOARD_TOKEN_FILE: `${work}/token`, OPENBOARD_STATE_DIR: `${work}/state` },
+  stdio: ['ignore', 'pipe', 'pipe'],
+});
+children.push(controller);
+const controllerLog = [];
+controller.stdout.on('data', d => controllerLog.push(d.toString())); controller.stderr.on('data', d => controllerLog.push(d.toString()));
+
+const base = `http://127.0.0.1:${PORT}`;
+const api = async (path, { method = 'GET', body } = {}) => {
+  const response = await fetch(base + path, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${data?.error || ''}`);
+  return data;
+};
+let state;
+for (let i = 0; i < 60; i++) {
+  try { state = await api('/api/local/state'); if (state.connected && state.apps.filter(a => a.lifecycle !== 'terminated').length >= 4) break; } catch { /* starting */ }
+  await sleep(500);
+}
+
+const browser = await puppeteer.connect({ browserURL: `http://127.0.0.1:${DEBUG}`, defaultViewport: null });
+const pageFor = async prefix => (await browser.pages()).find(page => page.url().startsWith(prefix));
+const shot = async (page, name) => { await page.screenshot({ path: `${out}/${name}.png` }); };
+
+try {
+  await step('controller connects and warms apps', async () => {
+    assert.equal(state?.connected, true, 'browser connected');
+    const live = state.apps.filter(app => app.lifecycle !== 'terminated').map(app => app.id);
+    for (const id of ['gev', 'home', 'astra', 'board']) assert(live.includes(id), `${id} open (${live})`);
+  });
+
+  await step('shell is injected into every app', async () => {
+    for (const prefix of ['http://localhost:4173/', 'http://localhost:8123/', `${APP}/apps/astra/`, `${APP}/apps/board/`]) {
+      const page = await pageFor(prefix);
+      assert(page, `page ${prefix}`);
+      await page.waitForFunction(() => !!window.__openboard?.diagnostics, { timeout: 15000 });
+      const d = await page.evaluate(() => window.__openboard.diagnostics());
+      assert(d.apps >= 5, `dock apps in ${prefix}: ${d.apps}`);
+    }
+  });
+
+  const gev = await pageFor('http://localhost:4173/');
+  await step('dock opens with a swipe up from the bottom edge', async () => {
+    await api('/api/local/apps/gev/activate', { method: 'POST' });
+    await gev.bringToFront();
+    await sleep(400);
+    const { w, h } = await gev.evaluate(() => ({ w: innerWidth, h: innerHeight }));
+    await gev.touchscreen.touchStart(w / 2, h - 4);
+    for (let y = h - 10; y > h - 130; y -= 15) await gev.touchscreen.touchMove(w / 2, y);
+    await gev.touchscreen.touchEnd();
+    await sleep(700);
+    const d = await gev.evaluate(() => window.__openboard.diagnostics());
+    assert.equal(d.open, true, 'dock open');
+    assert.equal(d.tiles, 2, 'two widget tiles');
+    await sleep(1200);
+    await shot(gev, '01-dock-gev');
+    const after = await gev.evaluate(() => window.__openboard.diagnostics());
+    assert.equal(after.glassError, '', `glass error: ${after.glassError}`);
+  });
+
+  await step('widget editor opens on long press', async () => {
+    await gev.evaluate(() => window.__openboard.openEditor());
+    await sleep(600);
+    await shot(gev, '02-widget-editor');
+    await gev.evaluate(() => window.__openboard.closeEditor());
+  });
+
+  await step('app switching via dock tap', async () => {
+    await gev.evaluate(() => window.__openboard.open());
+    await sleep(500);
+    const d = await gev.evaluate(() => window.__openboard.diagnostics());
+    // Home is the second icon in the dock.
+    const x = d.dock.left + 10 + 84 + 10 + 42, y = d.dock.top + d.dock.height / 2;
+    await gev.touchscreen.tap(x, y);
+    for (let i = 0; i < 20 && (await api('/api/local/state')).active !== 'home'; i++) await sleep(150);
+    assert.equal((await api('/api/local/state')).active, 'home');
+  });
+
+  const home = await pageFor('http://localhost:8123/');
+  await step('Home Assistant: target=_blank and window.open stay in the same tab without reload', async () => {
+    await home.bringToFront();
+    const origin = await home.evaluate(() => performance.timeOrigin);
+    const before = (await browser.pages()).length;
+    await home.click('#nav-blank');
+    await sleep(600);
+    await home.click('#nav-open');
+    await sleep(1500);
+    const after = (await browser.pages()).length;
+    assert.equal(after, before, `tab count ${before} → ${after}`);
+    assert.equal(await home.evaluate(() => performance.timeOrigin), origin, 'no reload');
+    assert.equal(await home.evaluate(() => location.pathname), '/lovelace/2');
+    await shot(home, '03-home');
+  });
+
+  await step('on-screen keyboard types into a focused field', async () => {
+    await home.click('#search');
+    await sleep(500);
+    assert.equal((await home.evaluate(() => window.__openboard.diagnostics())).keyboard, true, 'keyboard visible');
+    await shot(home, '04-keyboard');
+    // Press "h", "a" via the shell keyboard buttons.
+    for (const key of ['h', 'a']) {
+      const box = await home.evaluateHandle(() => document.getElementById('openboard-shell'));
+      void box;
+      await home.evaluate(k => window.openboardBridge(JSON.stringify({ action: 'key', text: k })), key);
+    }
+    await sleep(200);
+    assert.equal(await home.evaluate(() => document.getElementById('search').value), 'ha');
+  });
+
+  await step('freeze, resume and terminate a background app', async () => {
+    await api('/api/local/apps/home/activate', { method: 'POST' });
+    await api('/api/local/apps/board/suspend', { method: 'POST' });
+    let s = await api('/api/local/state');
+    assert.equal(s.apps.find(a => a.id === 'board').lifecycle, 'frozen');
+    await api('/api/local/apps/board/resume', { method: 'POST' });
+    s = await api('/api/local/state');
+    assert.equal(s.apps.find(a => a.id === 'board').lifecycle, 'background');
+    await api('/api/local/apps/board/terminate', { method: 'POST' });
+    s = await api('/api/local/state');
+    assert.equal(s.apps.find(a => a.id === 'board').lifecycle, 'terminated');
+    await api('/api/local/apps/board/activate', { method: 'POST' });
+    s = await api('/api/local/state');
+    assert.equal(s.active, 'board');
+    assert.equal(s.apps.find(a => a.id === 'board').lifecycle, 'active');
+  });
+
+  await step('per-app CPU and heap are measured', async () => {
+    await sleep(4500);
+    const s = await api('/api/local/state');
+    const gevApp = s.apps.find(a => a.id === 'gev');
+    assert(gevApp.heapMB != null, 'heap measured');
+  });
+
+  await step('sleep and wake', async () => {
+    await api('/api/local/display/sleep', { method: 'POST' });
+    const page = await pageFor(`${APP}/apps/board/`);
+    await sleep(1200);
+    assert.equal((await page.evaluate(() => window.__openboard.diagnostics())).asleep, true);
+    await shot(page, '05-sleep');
+    await api('/api/local/display/wake', { method: 'POST' });
+    await sleep(300);
+    assert.equal((await page.evaluate(() => window.__openboard.diagnostics())).asleep, false);
+  });
+
+  await step('light theme', async () => {
+    await api('/api/local/config', { method: 'PATCH', body: { appearance: { theme: 'light' } } });
+    await api('/api/local/apps/home/activate', { method: 'POST' });
+    await home.evaluate(() => window.__openboard.open());
+    await sleep(1400);
+    await shot(home, '06-dock-light-home');
+    await api('/api/local/config', { method: 'PATCH', body: { appearance: { theme: 'dark' } } });
+  });
+
+  await step('ASTRA bridge (mock)', async () => {
+    const hello = await api('/api/local/astra/hello');
+    assert(hello.name, 'hello');
+    const reply = await api('/api/local/astra/message', { method: 'POST', body: { text: 'Wie wird das Wetter?' } });
+    assert(reply.reply, 'reply');
+    const s = await api('/api/local/state');
+    assert.equal(s.astra.connected, true, 'SSE connected');
+  });
+
+  await step('widget catalog and config validation', async () => {
+    const { catalog } = await api('/api/local/widgets/catalog');
+    assert(catalog.length > 20);
+    const response = await fetch(base + '/api/local/config', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ performance: { mode: 'turbo' } }) });
+    assert.equal(response.status, 400);
+  });
+
+  await step('foreign origins and missing tokens are refused', async () => {
+    const foreign = await fetch(base + '/api/local/config', { method: 'PATCH', headers: { 'content-type': 'application/json', origin: 'https://evil.example' }, body: '{}' });
+    assert.equal(foreign.status, 403);
+    assert.equal((await fetch(base + '/api/v1/state')).status, 401);
+  });
+
+  for (const [id, name] of [['astra', '07-astra'], ['board', '08-board'], ['settings', '09-settings']]) {
+    await step(`screenshot ${id}`, async () => {
+      await api(`/api/local/apps/${id}/activate`, { method: 'POST' });
+      const page = await pageFor(`${APP}/apps/${id}/`);
+      await sleep(1500);
+      await shot(page, name);
+    });
+  }
+} finally {
+  await browser.disconnect();
+  if (!process.argv.includes('--keep')) { for (const child of children) child.kill(); stopFixtures(); }
+  const failed = results.filter(r => r[0] === 'fail');
+  console.log(`\n${results.length - failed.length}/${results.length} passed · screenshots: ${out}`);
+  if (failed.length) { console.log('--- controller log ---\n' + controllerLog.join('').slice(-4000)); process.exitCode = 1; }
+  if (!process.argv.includes('--keep')) setTimeout(() => process.exit(), 500);
+}
