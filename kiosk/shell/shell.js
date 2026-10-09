@@ -630,6 +630,7 @@ const mount = () => {
     const end = event => {
       if (resize?.id !== event.pointerId) return;
       resize = null; grip.classList.remove('drag'); keyboard.classList.remove('resizing');
+      publishKeyboardHeight();
       void bridge('config-patch', { patch: { appearance: { keyboardScale: Math.round(Number(keyboard.style.getPropertyValue('--kb')) * 100) / 100 } } });
     };
     on(grip, 'pointerup', end); on(grip, 'pointercancel', end);
@@ -663,8 +664,10 @@ const mount = () => {
   });
   const EDITABLE_TYPES = new Set(['text', 'search', 'url', 'email', 'password', 'tel', 'number', '']);
   const isEditable = element => element && ((element.tagName === 'INPUT' && EDITABLE_TYPES.has(element.type) && !element.readOnly && !element.disabled) || (element.tagName === 'TEXTAREA' && !element.readOnly) || element.isContentEditable);
-  const showKeyboard = target => { keyboardTarget = target; if (!keyboard.firstChild) renderKeyboard(); keyboard.classList.add('show'); };
-  function hideKeyboard() { keyboard.classList.remove('show'); keyboardTarget = null; }
+  // Apps that lift their own input above the keyboard read --ob-keyboard-height from <html>.
+  const publishKeyboardHeight = () => document.documentElement.style.setProperty('--ob-keyboard-height', keyboard.classList.contains('show') ? `${Math.round(keyboard.getBoundingClientRect().height + 24)}px` : '0px');
+  const showKeyboard = target => { keyboardTarget = target; if (!keyboard.firstChild) renderKeyboard(); keyboard.classList.add('show'); publishKeyboardHeight(); };
+  function hideKeyboard() { keyboard.classList.remove('show'); keyboardTarget = null; publishKeyboardHeight(); }
   const onFocus = event => { const target = event.composedPath()[0]; if (isEditable(target)) showKeyboard(target); };
   const onBlur = () => later(() => {
     let active = document.activeElement;
@@ -852,7 +855,7 @@ const mount = () => {
   };
   const dispose = () => {
     events.abort(); for (const id of timers) clearTimeout(id); stopGlass(); stopAudio();
-    glass.renderer?.destroy?.(); host.remove(); docStyle.remove();
+    glass.renderer?.destroy?.(); host.remove(); docStyle.remove(); document.documentElement.style.removeProperty('--ob-keyboard-height');
     if (viewportCreated) viewport.remove(); else if (viewportBefore != null) viewport.setAttribute('content', viewportBefore);
     if (window.__openboard?.dispose === dispose) delete window.__openboard;
   };

@@ -348,6 +348,9 @@ perf.on('prompt', prompt => { broadcast('prompt', prompt); if (display.asleep) v
 perf.on('toast', toast => void apps.event({ type: 'toast', ...toast }));
 astra.on('status', status => { broadcast('astra.status', status); publish(); });
 astra.on('event', (type, data) => {
+  // "Briefing am Display" off: alarms still ring, but the spoken briefing and its cards are dropped.
+  if (type === 'alarm' && !config().astra.briefingOnDisplay) { delete data.speech; delete data.speak; delete data.cards; }
+  if (type === 'say' && !config().astra.voice) delete data.speech;
   broadcast(`astra.${type}`, data);
   if (type === 'command') {
     if (data.action === 'sleep') void sleep();
@@ -437,7 +440,7 @@ router.get('/api/local/logs', async () => ({ controller: logLines.slice(-300), u
 router.get('/api/local/astra/hello', () => astra.hello());
 router.post('/api/local/astra/message', async ctx => {
   const body = await ctx.body();
-  return astra.message({ session_id: String(body.session_id || 'display-main').slice(0, 64), text: body.text, audio: body.audio, speak: !!body.speak, context: { ...context(), ...(body.context || {}) } });
+  return astra.message({ session_id: String(body.session_id || 'display-main').slice(0, 64), text: body.text, audio: body.audio, speak: !!body.speak && config().astra.voice, context: { ...context(), ...(body.context || {}) } });
 }, { limit: 12 * 1024 * 1024 });
 router.get('/api/local/astra/glance', ctx => astra.glance({ refresh: ctx.url.searchParams.get('refresh') === '1' }));
 router.post('/api/local/astra/tts', async ctx => astra.tts((await ctx.body()).text));
