@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenBoard OS · neutrale UI-Demo</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101929;color:#edf4fb;font-family:system-ui,sans-serif}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+main{position:absolute;left:370px;top:190px;pointer-events:none}
+.eyebrow{font-size:14px;letter-spacing:4px;color:#9ed9e5}
+h1{font-size:86px;line-height:1.05;letter-spacing:-4px;font-weight:650;margin:24px 0}
+p{font-size:23px;line-height:1.6;color:#bccddd;max-width:600px}
+.details{display:flex;gap:12px;margin-top:36px;font-size:14px;color:#c5d9e6}
+.details span{border:1px solid #b9dcec33;border-radius:30px;padding:12px 20px;background:#0a152b55}
+footer{position:absolute;bottom:40px;left:48px;right:48px;display:flex;justify-content:space-between;color:#acbecd;font-size:13px;letter-spacing:1px}
+</style>
+<canvas id="board" aria-label="Neutraler Demo-Hintergrund"></canvas>
+<main><div class="eyebrow">OPENBOARD OS / UI-PROTOTYP</div>
+<h1>Ein Display.<br>Deine Apps.</h1>
+<p>Ein kleiner App-Knopf. Ein gemeinsamer Einstieg.<br>Eine offene Arbeitsfläche als nächster Schritt.</p>
+<div class="details"><span>Touch-Switcher</span><span>IOR 1,5</span><span>Liquid Glass</span></div></main>
+<footer><span>NEUTRALE DEMO · KEINE VERBUNDENEN DIENSTE</span><span>Aktueller Prototyp · Whiteboard-OS in Planung</span></footer>
+<script>
+const canvas=document.getElementById('board'),ctx=canvas.getContext('2d');
+function paint(){
+  canvas.width=innerWidth;canvas.height=innerHeight;
+  const bg=ctx.createLinearGradient(0,0,innerWidth,innerHeight);
+  bg.addColorStop(0,'#173a4d');bg.addColorStop(.46,'#131c32');bg.addColorStop(1,'#111322');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);
+  for(let i=-12;i<56;i++){
+    ctx.beginPath();
+    for(let x=0;x<=innerWidth;x+=8){const y=i*26+70*Math.sin(x/190+i*.06)+.3*x;x?ctx.lineTo(x,y):ctx.moveTo(x,y);}
+    ctx.strokeStyle=i%4===0?'#b5dcd755':'#96c5d320';ctx.lineWidth=i%4===0?2:1;ctx.stroke();
+  }
+  const glow=ctx.createRadialGradient(1520,480,40,1520,480,600);
+  glow.addColorStop(0,'#ca86653d');glow.addColorStop(.5,'#826aa52b');glow.addColorStop(1,'#826aa500');
+  ctx.fillStyle=glow;ctx.fillRect(900,0,innerWidth-900,innerHeight);
+}
+paint();addEventListener('resize',paint);
+</script>
+</html>

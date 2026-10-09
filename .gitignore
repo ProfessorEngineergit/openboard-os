@@ -19,3 +19,8 @@ remote/backup-transfer.*
 *.xwd
 *.png
 *.wav
+
+# Explicitly reviewed synthetic documentation images only.
+!docs/screenshots/glass-panel.png
+!docs/screenshots/launcher.png
+!docs/screenshots/whiteboard.png

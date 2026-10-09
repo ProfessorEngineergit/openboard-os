@@ -1,6 +1,43 @@
-# MEGA DISPLAY Kiosk
+# OpenBoard OS
 
-Touch-Kiosk für Ubuntu mit X11: God’s Eye View, Home Assistant, eine eigene Assistenten-Weboberfläche und ein lokales Whiteboard. Eine private Fernansicht zeigt den echten Bildschirm über einen SSH-Tunnel.
+Eigenständiger Prototyp; nicht mit dem etablierten [OpenBoard](https://github.com/OpenBoard-org/OpenBoard) verbunden.
+
+Ein früher Prototyp auf dem Weg zu einem offenen **Whiteboard-OS**: eine eigene Touch-Arbeitsumgebung für große Displays, in der eigene Apps, Zeichnungen und Projekte zusammenkommen. Ziel ist eine gemeinsame Oberfläche mit schnellen App-Wechseln, Projekt-Arbeitsflächen und geregelter Ressourcenverteilung.
+
+Der heutige Stand ist eine Ubuntu-/X11-Kiosk-Shell mit Liquid-Glass-Switcher, konfigurierbaren Web-App-Tabs, lokalem Whiteboard und privatem Fernzugriff. God’s Eye View, Home Assistant und eine Assistenten-Oberfläche sind Beispiele einer Installation. Sie definieren weder den Zweck des Projekts noch eine feste Beschränkung auf vier Apps. Die aktuelle UI und die Prüfer sind allerdings noch auf diese erste Konfiguration abgestimmt.
+
+## Vision und Entwicklungsstand
+
+Geplant ist eine frei erweiterbare Arbeitsumgebung: eigene Apps hinzufügen, Projekte als Arbeitsflächen speichern und Fenster beziehungsweise App-Flächen passend zu einem großen Touchscreen anordnen. Die Benutzeroberfläche soll Zeichnen, Inhalte und Anwendungen zusammenführen.
+
+| Bereich | Heute | Geplant |
+| --- | --- | --- |
+| Eigene Apps | URLs über lokale Konfiguration; Switcher mit ersten Beispiel-Apps | Allgemeines App-Verzeichnis, eigene Icons, flexible Zahl von Apps und Projekt-Zuordnung |
+| Whiteboard-UI | Lokale Zeichenfläche mit Werkzeugen und Speicherung | Gemeinsame Projekt-Flächen mit Zeichnungen, Materialien und App-Rahmen; Anordnen und Skalieren |
+| Windows-/native Apps | Keine entsprechende App-Integration | Adapter für native Linux-Apps und entfernte Windows-Sitzungen; zum Beispiel Windows-VM mit RDP/Guacamole |
+| Schnelle Wechsel | Bestehende Browser-Tabs bleiben geladen | Priorisiertes Vorladen, begrenzter Cache, gezieltes Schlafen und Wiederherstellen von Apps |
+| Performance | GEV-FPS-/Auflösungsbegrenzung; Glas-Rendering nur in sichtbaren Seiten, ungefähr 7 FPS | Sichtbarkeitsabhängiges Throttling, abgestimmte CPU-/GPU-/RAM-Budgets und nachvollziehbare Messwerte pro App |
+| Zustand und Betrieb | Whiteboard-Speicherung, Neustart der Dienste, Netz-/Display-Wiederverbindung | Projektweite Wiederherstellung und portable Sicherungen |
+
+Beim geplanten Ressourcenmanager soll die aktive App Vorrang haben. Unsichtbare Apps sollen je nach Bedarf weiterlaufen, gedrosselt oder pausiert werden. Audio, Datenübertragungen und ungespeicherte Arbeit brauchen eigene Regeln. Caches sollen Größenlimits und kontrollierte Bereinigung erhalten. Diese globale App-Verwaltung ist noch nicht implementiert.
+
+Ähnliche Ansätze existieren bereits, insbesondere SAGE3 mit Apps auf einer gemeinsamen Fläche. Die Recherche samt Funktionen, Grenzen und Lizenzunterschieden steht unter [Ähnliche Projekte](docs/whiteboard-os-research.md).
+
+## Screenshots
+
+Die Bilder zeigen den aktuellen Switcher und das reale Whiteboard-UI mit ausschließlich generierten Beispieldaten. Sie entstehen in einem isolierten Browser gegen einen lokalen Demo-Server, ohne Zugriff auf Konten oder das installierte Display. Die zukünftige Whiteboard-OS-Arbeitsfläche ist darin noch nicht umgesetzt. [Herkunft und Neuerzeugung](docs/screenshots/README.md).
+
+**App-Panel mit neutralen Projekt-Namen**
+
+![Liquid-Glass-App-Panel auf einem neutralen Demo-Hintergrund](docs/screenshots/glass-panel.png)
+
+**Kleiner, verschiebbarer App-Knopf**
+
+![Minimierter App-Knopf auf demselben Demo-Hintergrund](docs/screenshots/launcher.png)
+
+**Whiteboard mit Beispielzeichnung**
+
+![Whiteboard-Werkzeuge und generierte Beispielzeichnung](docs/screenshots/whiteboard.png)
 
 ## Oberfläche
 
@@ -13,7 +50,7 @@ Touch-Kiosk für Ubuntu mit X11: God’s Eye View, Home Assistant, eine eigene A
 - Der Cursor wird auf X11 und in den App-Seiten ausgeblendet.
 - Whiteboard mit Stift, Radierer, Farben, Undo/Redo, PNG-Export und lokaler Speicherung.
 
-Über GEV und Whiteboard verzerrt der Glass-Renderer die Canvas-Pixel direkt unter dem Knopf beziehungsweise Panel. Über gewöhnlichen HTML-Seiten greift der CSS-Backdrop-Effekt. Ein einfarbiger Hintergrund liefert entsprechend wenig sichtbare Lichtbrechung. Die WebGL-Aktualisierung ist auf ungefähr sieben Bilder pro Sekunde begrenzt, um Ressourcen für die Karte zu lassen.
+Über GEV und Whiteboard verzerrt der Glass-Renderer die Canvas-Pixel direkt unter dem Knopf beziehungsweise Panel. Über gewöhnlichen HTML-Seiten verwendet er einen lokalen DOM-Painter; dessen Darstellungsgrenzen sind unten dokumentiert. CSS-Backdrop ergänzt den Effekt. Ein einfarbiger Hintergrund liefert entsprechend wenig sichtbare Lichtbrechung. Die WebGL-Aktualisierung ist auf ungefähr sieben Bilder pro Sekunde begrenzt, um Ressourcen für die aktive App zu lassen.
 
 ## Installation
 
@@ -99,7 +136,7 @@ Die vollständige Prüfung nur mit entbehrlichen Testzeichnungen ausführen. Pr�
 
 ## Datenschutz im Repository
 
-Dieses Repository enthält ausschließlich Quellcode, generische Beispielkonfiguration und Abhängigkeiten-Metadaten. Lokale Konfiguration, API-Token, Provider-Schlüssel, Browserprofile, Zeichnungen, Sicherungen, Geräteinventar, Screenshots und Logs werden nicht hochgeladen. Reale Hosts und Kontodaten müssen lokal konfiguriert werden.
+Dieses Repository enthält Quellcode, generische Beispielkonfiguration, Abhängigkeiten-Metadaten und drei ausdrücklich freigegebene synthetische Demo-Screenshots. Lokale Konfiguration, API-Token, Provider-Schlüssel, Browserprofile, persönliche Zeichnungen, Sicherungen, Geräteinventar, reale Bildschirmaufnahmen und Logs werden nicht hochgeladen. Reale Hosts und Kontodaten müssen lokal konfiguriert werden. Die PNG-Ausnahmen im Datenschutz-Prüfer sind auf die drei Demo-Dateien begrenzt; sie ersetzen nicht deren visuelle Prüfung.
 
 ## Drittanbieter
 
