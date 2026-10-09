@@ -8,7 +8,7 @@ import { createStore } from './store.js';
 import { InkLayer, strokeToElement } from './ink.js';
 import { BoardSync, request, HttpError } from './sync.js';
 import { createOps } from './ops.js';
-import { SWATCHES, PEN_WIDTHS, HIGHLIGHTER, STICKY_COLORS, PAPER_BACKGROUND, displayColor, paperTheme } from './colors.js';
+import { SWATCHES, HL_SWATCHES, PEN_WIDTHS, HIGHLIGHTER, STICKY_COLORS, PAPER_BACKGROUND, displayColor, paperTheme } from './colors.js';
 
 const LAST_BOARD_KEY = 'openboard.board.current';
 const PREFS_KEY = 'openboard.board.prefs';
@@ -61,7 +61,7 @@ export class BoardController {
     this.store = createStore({
       ready: false,
       tool: 'pen', shape: prefs.shape || 'rect', selectMode: 'select',
-      penColor: prefs.penColor || SWATCHES[0].color, hlColor: prefs.hlColor || SWATCHES[7].color,
+      penColor: prefs.penColor || SWATCHES[0].color, hlColor: HL_SWATCHES.some(sw => sw.color === prefs.hlColor) ? prefs.hlColor : HL_SWATCHES[0].color,
       width: prefs.width || 'm',
       collapsed: false, popover: null, sheet: null,
       boards: [], boardId: null, boardName: '',
@@ -119,7 +119,18 @@ export class BoardController {
       prediction: () => this.config.prediction !== false,
       onCommit: stroke => this.commitStroke(stroke),
       onLasso: points => this.lassoSelect(points),
+      onActive: active => this.setInking(active),
     });
+  }
+
+  // Focus mode while writing: the glass toolbar fades out during a stroke and returns shortly after
+  // the last one (config.board.autoHideToolbar, default on). Pure DOM class, no React round trip.
+  setInking(active) {
+    clearTimeout(this.inkingTimer);
+    const root = document.querySelector('.board-root');
+    if (!root) return;
+    if (active) { if (this.config.autoHideToolbar !== false) root.classList.add('inking'); return; }
+    this.inkingTimer = setTimeout(() => root.classList.remove('inking'), 650);
   }
 
   inkStyle() {

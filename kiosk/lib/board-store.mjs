@@ -165,26 +165,86 @@ function validateOps(body) {
 const LEGACY_INK = '#182633';
 const randomInt = () => randomBytes(4).readUInt32BE(0) >>> 1;
 const randomId = () => randomBytes(16).toString('base64url').slice(0, 21);
+const ERASE_WORK_LIMIT = 4e8; // distance checks; beyond that remaining erasers are ignored
+
+// Old strokes were straight polylines; densify so perfect-freehand's streamline keeps corners.
+function densify(raw) {
+  const points = [raw[0]];
+  for (let i = 1; i < raw.length; i++) {
+    const a = raw[i - 1], b = raw[i];
+    const steps = Math.min(200, Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / 3));
+    for (let s = 1; s < steps; s++) points.push({ x: a.x + ((b.x - a.x) * s) / steps, y: a.y + ((b.y - a.y) * s) / steps });
+    points.push(b);
+  }
+  return points;
+}
+
+// The old canvas erased with `destination-out` (round-capped line, width = stroke.width). Elements
+// cannot be partially erased, so every earlier stroke is cut where its points lie inside the
+// eraser path: the remaining runs become separate strokes. Returns false when work was skipped.
+function applyEraser(pieces, eraser, budget) {
+  const raw = eraser.points.filter(p => Number.isFinite(p?.x) && Number.isFinite(p?.y));
+  if (!raw.length) return true;
+  const r = (Number.isFinite(eraser.width) ? eraser.width : 36) / 2;
+  const segs = raw.length === 1 ? [[raw[0], raw[0]]] : raw.slice(1).map((p, i) => [raw[i], p]);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of raw) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+  minX -= r; minY -= r; maxX += r; maxY += r;
+  const r2 = r * r;
+  const covered = p => {
+    for (const [a, b] of segs) {
+      if (p.x < Math.min(a.x, b.x) - r || p.x > Math.max(a.x, b.x) + r || p.y < Math.min(a.y, b.y) - r || p.y > Math.max(a.y, b.y) + r) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+      const t = len2 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2)) : 0;
+      const ex = a.x + t * dx - p.x, ey = a.y + t * dy - p.y;
+      if (ex * ex + ey * ey <= r2) return true;
+    }
+    return false;
+  };
+  for (let i = 0; i < pieces.length; i++) {
+    const piece = pieces[i];
+    if (piece.maxX < minX || piece.minX > maxX || piece.maxY < minY || piece.minY > maxY) continue;
+    if ((budget.left -= piece.points.length * segs.length) < 0) return false;
+    const runs = [];
+    let run = [];
+    for (const p of piece.points) {
+      if (covered(p)) { if (run.length) runs.push(run); run = []; } else run.push(p);
+    }
+    if (run.length) runs.push(run);
+    if (runs.length === 1 && runs[0].length === piece.points.length) continue; // untouched
+    const replacement = runs.map(points => ({ ...piece, ...extent(points), points }));
+    pieces.splice(i, 1, ...replacement);
+    i += replacement.length - 1;
+  }
+  return true;
+}
+
+function extent(points) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+  return { minX, minY, maxX, maxY };
+}
 
 export function convertLegacy(data) {
   const strokes = Array.isArray(data?.strokes) ? data.strokes : [];
   let start = 0;
   strokes.forEach((stroke, index) => { if (stroke?.clear === true) start = index + 1; });
-  const elements = [];
-  let skippedErase = 0, skippedInvalid = 0;
-  const now = Date.now();
+  let skippedErase = 0, skippedInvalid = 0, erasers = 0;
+  const budget = { left: ERASE_WORK_LIMIT };
+  const pieces = [];
   for (const stroke of strokes.slice(start)) {
-    if (stroke?.erase) { skippedErase++; continue; }
     const raw = Array.isArray(stroke?.points) ? stroke.points.filter(p => Number.isFinite(p?.x) && Number.isFinite(p?.y)) : [];
-    if (!raw.length) { skippedInvalid++; continue; }
-    // Old strokes were straight polylines; densify so perfect-freehand's streamline keeps corners.
-    const points = [raw[0]];
-    for (let i = 1; i < raw.length; i++) {
-      const a = raw[i - 1], b = raw[i];
-      const steps = Math.min(200, Math.floor(Math.hypot(b.x - a.x, b.y - a.y) / 3));
-      for (let s = 1; s < steps; s++) points.push({ x: a.x + ((b.x - a.x) * s) / steps, y: a.y + ((b.y - a.y) * s) / steps });
-      points.push(b);
+    if (stroke?.erase) {
+      if (applyEraser(pieces, stroke, budget)) erasers++; else skippedErase++;
+      continue;
     }
+    if (!raw.length) { skippedInvalid++; continue; }
+    const points = densify(raw);
+    pieces.push({ stroke, points, ...extent(points) });
+  }
+  const elements = [];
+  const now = Date.now();
+  for (const { stroke, points } of pieces) {
     const x0 = points[0].x, y0 = points[0].y;
     const rel = points.map(p => [p.x - x0, p.y - y0]);
     if (rel.length === 1) rel.push([0.0001, 0.0001]);
@@ -195,14 +255,14 @@ export function convertLegacy(data) {
       width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys), angle: 0,
       strokeColor: !stroke.color || stroke.color.toLowerCase() === LEGACY_INK ? '#1e1e1e' : stroke.color,
       backgroundColor: 'transparent', fillStyle: 'solid',
-      // Old strokes were constant-width lines; perfect-freehand at pressure 0.5 renders ≈ 6 × strokeWidth.
+      // Old strokes were constant-width lines; perfect-freehand at pressure 0.5 renders exactly 6 × strokeWidth.
       strokeWidth: Math.round((width / 6) * 100) / 100, strokeStyle: 'solid', roughness: 0, opacity: 100,
       groupIds: [], frameId: null, roundness: null, seed: randomInt(), version: 1, versionNonce: randomInt(),
       isDeleted: false, boundElements: null, updated: now, link: null, locked: false,
       points: rel, pressures: rel.map(() => 0.5), simulatePressure: false, lastCommittedPoint: rel[rel.length - 1],
     });
   }
-  return { elements, skippedErase, skippedInvalid, dark: !!data?.dark };
+  return { elements, erasers, skippedErase, skippedInvalid, dark: !!data?.dark };
 }
 
 // ---------- store ----------
@@ -233,13 +293,13 @@ export class BoardStore {
   async migrateLegacy() {
     const legacy = await readJson(this.legacyFile).catch(() => null);
     if (!legacy) return null;
-    const { elements, skippedErase, skippedInvalid, dark } = convertLegacy(legacy);
+    const { elements, erasers, skippedErase, skippedInvalid, dark } = convertLegacy(legacy);
     const board = await this.createBoard({
       name: 'Whiteboard',
       elements,
-      migratedFrom: { file: 'whiteboard/current.json', at: new Date().toISOString(), strokes: elements.length, skippedErase, skippedInvalid, dark },
+      migratedFrom: { file: 'whiteboard/current.json', at: new Date().toISOString(), strokes: elements.length, erasers, skippedErase, skippedInvalid, dark },
     });
-    this.log(`board-store: migrated ${elements.length} strokes from ${this.legacyFile}` + (skippedErase ? ` (${skippedErase} eraser strokes skipped)` : ''));
+    this.log(`board-store: migrated ${elements.length} strokes from ${this.legacyFile}` + (erasers ? ` (${erasers} eraser strokes applied)` : '') + (skippedErase ? ` (${skippedErase} eraser strokes skipped)` : ''));
     return board;
   }
 

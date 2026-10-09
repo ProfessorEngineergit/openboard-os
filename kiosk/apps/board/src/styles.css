@@ -26,6 +26,10 @@ body { background: #fff; }
 .ink-layer { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 4; }
 
 /* ---- Toolbar ---- */
+/* While a stroke is being drawn the glass toolbar is removed from compositing: nothing sits above the
+   desynchronized ink canvas and no backdrop blur has to be re-evaluated per frame. */
+.tb-wrap { transition: opacity 220ms var(--ob-ease), visibility 0s linear 0s; }
+.board-root.inking .tb-wrap { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 70ms linear, visibility 0s linear 70ms; }
 .tb-wrap {
   position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 10;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
@@ -55,7 +59,7 @@ body { background: #fff; }
 
 .tb-board {
   appearance: none; border: 0; background: transparent; color: var(--ob-text);
-  height: var(--ob-touch); min-width: 176px; max-width: 250px; padding: 0 16px 0 12px; margin-right: 2px;
+  height: var(--ob-touch); width: 236px; flex: none; padding: 0 16px 0 12px; margin-right: 2px;
   border-radius: var(--ob-r-pill); display: flex; align-items: center; gap: 11px; text-align: left;
   font-family: var(--ob-font); touch-action: manipulation;
   transition: background var(--ob-dur-fast) var(--ob-ease), transform var(--ob-dur-fast) var(--ob-ease);
@@ -64,7 +68,7 @@ body { background: #fff; }
 .tb-board svg.ob-icon { width: 24px; height: 24px; color: var(--ob-text-dim); }
 .tb-board-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
 .tb-board-text strong { font-size: 16px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.tb-board-text small { font-size: 12.5px; color: var(--ob-text-dim); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tb-board-text small { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; min-width: 0; color: var(--ob-text-dim); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .tb-board-text small.offline, .tb-board-text small.error { color: var(--ob-warn); }
 [data-ob-theme="light"] .tb-board-text small.offline, [data-ob-theme="light"] .tb-board-text small.error { color: #a86a00; }
 
@@ -82,7 +86,8 @@ body { background: #fff; }
 
 /* ---- Popovers ---- */
 .tb-pop {
-  position: absolute; top: calc(100% - 4px); padding: 14px; border-radius: var(--ob-r-lg) !important;
+  --pad: 14px; --inner: 18px;
+  position: absolute; top: calc(100% - 4px); padding: var(--pad); border-radius: calc(var(--inner) + var(--pad)) !important; /* nested corners: outer = inner + padding */
   animation: pop-in var(--ob-dur) var(--ob-spring); transform-origin: top center;
   transition: opacity var(--ob-dur-fast);
 }
@@ -102,7 +107,8 @@ body { background: #fff; }
 .width span { color: var(--ob-text-dim); }
 .width[aria-pressed="true"] { background: var(--ob-glass-selected); box-shadow: inset 0 0 0 1px var(--ob-glass-edge); }
 .width[aria-pressed="true"] span { color: var(--ob-text); }
-.seg-row { display: flex; gap: 4px; }
+.tb-pop.seg { --pad: 6px; --inner: 28px; }
+.seg-row { display: flex; gap: 2px; }
 .menu { display: flex; flex-direction: column; min-width: 340px; }
 .menu-item { appearance: none; border: 0; background: transparent; color: var(--ob-text); min-height: var(--ob-touch); padding: 0 16px 0 12px; border-radius: var(--ob-r); display: flex; align-items: center; gap: 14px; font: 500 17px var(--ob-font); text-align: left; white-space: nowrap; touch-action: manipulation; }
 .menu-item small { margin-left: auto; padding-left: 16px; color: var(--ob-text-faint); font-size: 13px; font-weight: 400; }
@@ -114,7 +120,7 @@ body { background: #fff; }
 /* ---- Sheets ---- */
 .sheet {
   position: absolute; top: calc(100% - 4px); width: min(600px, calc(100vw - 160px)); max-height: min(70vh, 760px);
-  display: flex; flex-direction: column; border-radius: var(--ob-r-xl) !important; overflow: hidden;
+  display: flex; flex-direction: column; border-radius: 40px !important; overflow: hidden;
   animation: pop-in var(--ob-dur-slow) var(--ob-spring); transform-origin: top center;
 }
 .sheet header { display: flex; align-items: center; padding: 14px 10px 6px 26px; }
@@ -127,13 +133,13 @@ body { background: #fff; }
 .row + .row { box-shadow: 0 -1px 0 var(--ob-hair); }
 .row.active { background: var(--ob-glass-selected); box-shadow: inset 0 0 0 1px var(--ob-glass-edge); }
 .row.active + .row { box-shadow: none; }
-.row-main { appearance: none; border: 0; background: transparent; color: var(--ob-text); flex: 1; min-width: 0; min-height: 64px; padding: 0 12px; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 3px; border-radius: var(--ob-r); font-family: var(--ob-font); touch-action: manipulation; }
+.row-main { appearance: none; border: 0; background: transparent; color: var(--ob-text); flex: 1; min-width: 0; min-height: 64px; padding: 0 12px; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 3px; border-radius: 14px; font-family: var(--ob-font); touch-action: manipulation; }
 .row-main strong { font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .row-main small { font-size: 13.5px; color: var(--ob-text-dim); }
 button.row-main:active { background: var(--ob-glass-pressed); }
 .row-check { color: var(--ob-text-dim); padding: 0 6px; }
 .row.editing { padding: 8px; gap: 8px; }
-.row.editing .ob-input { flex: 1; background: var(--ob-glass-pressed); border-color: var(--ob-glass-edge); border-radius: var(--ob-r); }
+.row.editing .ob-input { flex: 1; background: var(--ob-glass-pressed); border-color: var(--ob-glass-edge); border-radius: 10px; }
 .row.confirm { background: var(--ob-glass-pressed); }
 .pill { appearance: none; border: 1px solid var(--ob-hair); background: var(--ob-glass-pressed); color: var(--ob-text); min-height: 52px; padding: 0 20px; border-radius: var(--ob-r-pill); display: inline-flex; align-items: center; gap: 8px; font: 600 15.5px var(--ob-font); white-space: nowrap; touch-action: manipulation; transition: transform var(--ob-dur-fast) var(--ob-ease); }
 .pill svg.ob-icon { width: 21px; height: 21px; }
@@ -144,6 +150,6 @@ button.row-main:active { background: var(--ob-glass-pressed); }
 @media (max-width: 1100px) {
   .tb-wrap { max-width: calc(100vw - 24px); top: 10px; }
   .tb { overflow-x: auto; scrollbar-width: none; max-width: calc(100vw - 24px); }
-  .tb-board { min-width: 0; max-width: 150px; }
+  .tb-board { width: 168px; }
   .sheet { width: calc(100vw - 24px); }
 }

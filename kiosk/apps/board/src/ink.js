@@ -42,14 +42,16 @@ export class InkLayer {
    * @param {() => (null | {kind:'pen'|'highlighter'|'lasso', color:string, display:string, strokeWidth:number, opacity:number})} o.getStyle
    * @param {(stroke) => void} o.onCommit
    * @param {(points) => void} o.onLasso
+   * @param {(active: boolean) => void} [o.onActive] a stroke is really being drawn (moved > 10 px) / has ended
    * @param {() => boolean} o.prediction
    */
-  constructor({ canvas, getView, getStyle, onCommit, onLasso, prediction = () => true, palmSize = 46 }) {
+  constructor({ canvas, getView, getStyle, onCommit, onLasso, onActive, prediction = () => true, palmSize = 46 }) {
     this.canvas = canvas;
     this.getView = getView;
     this.getStyle = getStyle;
     this.onCommit = onCommit;
     this.onLasso = onLasso;
+    this.onActive = onActive;
     this.prediction = prediction;
     this.palmSize = palmSize;
     this.active = null;
@@ -160,6 +162,7 @@ export class InkLayer {
     const pressure = a.style.kind === 'highlighter' ? 0.5 : (a.simulate ? 0.5 : Math.max(0.05, e.pressure || 0.5));
     a.points.push([x, y, pressure]);
     a.last = { x: e.clientX, y: e.clientY, width: e.width, height: e.height };
+    if (!a.signaled && a.length * a.view.zoom > 10) { a.signaled = true; this.onActive?.(true); }
   }
 
   addCoalesced(e) {
@@ -209,6 +212,7 @@ export class InkLayer {
     if (ended) this.add(e);
     this.active = null;
     a.predicted = [];
+    if (a.signaled) this.onActive?.(false);
     if (!ended && a.length < 24) { this.redrawAll(); return; }
     this.finish(a);
   }
@@ -216,6 +220,7 @@ export class InkLayer {
   handover(second) {
     const a = this.active;
     this.active = null;
+    if (a.signaled) this.onActive?.(false);
     // A finger that has already drawn a real line before the second one landed keeps its stroke.
     const deliberate = performance.now() - a.started > 400 && a.length * a.view.zoom > 60;
     if (deliberate) this.finish(a); else this.redrawAll();
@@ -322,6 +327,7 @@ export class InkLayer {
   }
 
   cancel() {
+    if (this.active?.signaled) this.onActive?.(false);
     this.active = null;
     this.redrawAll();
   }

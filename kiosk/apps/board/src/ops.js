@@ -14,7 +14,21 @@ function withDefaults(skeleton) {
   const el = { roughness: 0, ...skeleton };
   if (el.type === 'text' && el.fontFamily === undefined) el.fontFamily = FONT_FAMILY.Nunito;
   if (el.label && typeof el.label === 'object' && el.label.fontFamily === undefined) el.label = { fontFamily: FONT_FAMILY.Nunito, ...el.label };
+  // Shapes created implicitly for arrow ends get the same calm style.
+  for (const end of ['start', 'end']) if (el[end] && typeof el[end] === 'object') el[end] = withDefaults(el[end]);
   return el;
+}
+
+// Excalidraw measures text with whatever font is loaded at that moment; inserting before the
+// face has loaded gives too-narrow boxes and clipped text. Load every shipped face once.
+let fontsReady = null;
+function ensureFonts() {
+  if (!fontsReady) {
+    fontsReady = Promise.all([...document.fonts].map(face => face.load().catch(() => null)))
+      .then(() => document.fonts.ready)
+      .catch(() => null);
+  }
+  return fontsReady;
 }
 
 function bounds(elements) {
@@ -158,6 +172,8 @@ export function createOps({ getApi, getInk }) {
       const type = op.op || op.type;
       const handler = handlers[type];
       if (!handler) throw new Error(`Unbekannte Operation: ${type}`);
+      if (type !== 'add_image' && type !== 'add_svg') await ensureFonts();
+      else if (op.caption) await ensureFonts();
       return handler(op);
     },
   };
