@@ -603,6 +603,7 @@ export function mountSettings(root, { layout = 'touch', api, section, single = f
       schedule.hidden = !store.config?.display?.schedule?.enabled;
       el.append(card,
         c.group('Ruhezustand', [
+          c.row({ label: 'Ausrichtung', sub: 'Dreht Bild und Touch. Hochformat = 1080 × 1920.', control: c.segment('display.orientation', [['landscape', 'Quer'], ['portrait', 'Hoch'], ['landscape-flipped', 'Quer ↻'], ['portrait-flipped', 'Hoch ↻']], 'Ausrichtung') }),
           c.row({ label: 'Art', control: c.segment('display.sleepMode', [['black', 'Schwarzbild'], ['dpms', 'Signal aus (DPMS)']], 'Art des Ruhezustands') }),
           h('div', { class: 'ob-row obs-row is-block' }, explain),
           c.row({ label: 'Automatisch schlafen nach', sub: 'Ohne Berührung. 0 = nie.', control: c.number('display.idleSleepMinutes', { min: 0, max: 600, step: 5, unit: 'min', label: 'Automatisch schlafen' }) }),

@@ -34,6 +34,7 @@ export function discoveryMessages(config, { version, apps }) {
     entity('switch', 'screen', { name: 'Bildschirm', icon: 'mdi:monitor', state_topic: `${base}/screen/state`, command_topic: `${base}/screen/set` }),
     entity('select', 'app', { name: 'App', icon: 'mdi:apps', state_topic: `${base}/app/state`, command_topic: `${base}/app/set`, options: apps.map(app => app.name) }),
     entity('select', 'performance', { name: 'Leistungsmodus', icon: 'mdi:speedometer', state_topic: `${base}/performance/state`, command_topic: `${base}/performance/set`, options: ['eco', 'balanced', 'max'] }),
+    entity('select', 'orientation', { name: 'Ausrichtung', icon: 'mdi:screen-rotation', state_topic: `${base}/orientation/state`, command_topic: `${base}/orientation/set`, options: ['landscape', 'portrait', 'landscape-flipped', 'portrait-flipped'] }),
     entity('select', 'theme', { name: 'Design', icon: 'mdi:theme-light-dark', state_topic: `${base}/theme/state`, command_topic: `${base}/theme/set`, options: ['dark', 'light', 'auto'] }),
     entity('text', 'say', { name: 'Sagen', icon: 'mdi:account-voice', command_topic: `${base}/say/set`, state_topic: `${base}/say/state`, max: 255 }),
     entity('button', 'reload', { name: 'App neu laden', icon: 'mdi:reload', command_topic: `${base}/button/reload` }),
@@ -104,6 +105,7 @@ export class MqttBridge extends EventEmitter {
     else if (topic === `${base}/app/set`) await h.app(text);
     else if (topic === `${base}/performance/set`) await h.performance(text);
     else if (topic === `${base}/theme/set`) await h.theme(text);
+    else if (topic === `${base}/orientation/set`) await h.orientation(text);
     else if (topic === `${base}/say/set`) { this.client?.publish(`${base}/say/state`, text.slice(0, 255), { retain: true }); await h.say(text); }
     else if (topic === `${base}/button/reload`) await h.reload();
     else if (topic === `${base}/button/restart_browser`) await h.restartBrowser();
@@ -131,13 +133,14 @@ export class MqttBridge extends EventEmitter {
   publishState(context, force = false) {
     if (!this.connected) return;
     const base = this.base, publish = (topic, value) => this.client.publish(`${base}/${topic}`, String(value), { retain: true });
-    const signature = JSON.stringify([context.asleep, context.appName, context.performance, context.theme, context.astra, context.updateAvailable]);
+    const signature = JSON.stringify([context.asleep, context.appName, context.performance, context.theme, context.orientation, context.astra, context.updateAvailable]);
     if (force || signature !== this.lastSignature) {
       this.lastSignature = signature;
       publish('screen/state', context.asleep ? 'OFF' : 'ON');
       publish('app/state', context.appName || '');
       publish('performance/state', context.performance);
       publish('theme/state', context.theme);
+      publish('orientation/state', context.orientation);
       publish('astra/state', context.astra ? 'ON' : 'OFF');
       publish('update/state', context.updateAvailable ? 'ON' : 'OFF');
     }

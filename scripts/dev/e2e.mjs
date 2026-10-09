@@ -172,6 +172,25 @@ try {
     assert.equal(await home.evaluate(() => document.getElementById('search').value), 'ha');
   });
 
+  await step('keyboard resizes by dragging a corner and keeps the size', async () => {
+    const before = await home.evaluate(() => window.__openboard.diagnostics());
+    assert(before.keyboard, 'keyboard visible');
+    const r = before.keyboardRect, cx = r.left + r.width / 2;
+    // Top-right corner grip: drag towards the centre to shrink.
+    await home.mouse.move(r.right + 2, r.top - 2);
+    await home.mouse.down();
+    await home.mouse.move(cx + 300, r.top + 16, { steps: 8 });
+    await home.mouse.up();
+    await sleep(500);
+    const after = await home.evaluate(() => window.__openboard.diagnostics());
+    assert(after.keyboardScale < before.keyboardScale - 0.3, `scale ${before.keyboardScale} → ${after.keyboardScale}`);
+    for (let i = 0; i < 20 && (await api('/api/local/config')).appearance.keyboardScale === 1; i++) await sleep(100);
+    const saved = (await api('/api/local/config')).appearance.keyboardScale;
+    assert(Math.abs(saved - after.keyboardScale) < 0.02, `saved ${saved}`);
+    await shot(home, '04b-keyboard-small');
+    await api('/api/local/config', { method: 'PATCH', body: { appearance: { keyboardScale: 1 } } });
+  });
+
   await step('freeze, resume and terminate a background app', async () => {
     await api('/api/local/apps/home/activate', { method: 'POST' });
     await api('/api/local/apps/board/suspend', { method: 'POST' });
@@ -236,6 +255,26 @@ try {
     const foreign = await fetch(base + '/api/local/config', { method: 'PATCH', headers: { 'content-type': 'application/json', origin: 'https://evil.example' }, body: '{}' });
     assert.equal(foreign.status, 403);
     assert.equal((await fetch(base + '/api/v1/state')).status, 401);
+  });
+
+  await step('portrait (1080×1920): built-in apps and the dock fit without horizontal overflow', async () => {
+    const problems = [];
+    for (const [id, prefix] of [['astra', `${APP}/apps/astra/`], ['board', `${APP}/apps/board/`], ['settings', `${APP}/apps/settings/`], ['home', 'http://localhost:8123/']]) {
+      await api(`/api/local/apps/${id}/activate`, { method: 'POST' });
+      const page = await pageFor(prefix);
+      await page.setViewport({ width: 1080, height: 1920 });
+      await sleep(1200);
+      const overflow = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: innerWidth }));
+      if (overflow.sw > overflow.iw + 1) problems.push(`${id}: scrollWidth ${overflow.sw} > ${overflow.iw}`);
+      await page.evaluate(() => window.__openboard.open());
+      await sleep(1500);
+      const d = await page.evaluate(() => window.__openboard.diagnostics());
+      if (d.dock.left < 0 || d.dock.right > 1080) problems.push(`${id}: dock ${Math.round(d.dock.left)}..${Math.round(d.dock.right)}`);
+      await shot(page, `10-portrait-${id}`);
+      await page.evaluate(() => window.__openboard.close());
+      await page.setViewport({ width: 1920, height: 993 });
+    }
+    assert.deepEqual(problems, []);
   });
 
   for (const [id, name] of [['astra', '07-astra'], ['board', '08-board'], ['settings', '09-settings']]) {

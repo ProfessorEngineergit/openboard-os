@@ -49,7 +49,7 @@ export function pickTerminationCandidate(apps, { active, protectedIds, minIdleMs
     .filter(app => app.id !== active && app.residency !== 'always' && !protectedIds.has(app.id))
     .filter(app => app.lifecycle === 'background' || app.lifecycle === 'frozen')
     .filter(app => now - (app.lastActive || app.openedAt || 0) >= minIdleMs && !(cooldowns.get(app.id) > now))
-    .map(app => ({ app, score: cost(app) * ((now - (app.lastActive || 0)) / 60000) }))
+    .map(app => ({ app, score: cost(app) * ((now - (app.lastActive || app.openedAt || now)) / 60000) }))
     .sort((a, b) => b.score - a.score)[0]?.app || null;
 }
 
@@ -141,7 +141,8 @@ export class PerformanceManager extends EventEmitter {
     // 1. Eco apps and sleep: freezing hidden apps costs nothing and resumes instantly.
     for (const app of apps) {
       if (app.lifecycle !== 'background' || app.id === this.apps.active || protectedIds.has(app.id) || app.residency === 'always') continue;
-      const idle = now - (app.lastActive || 0);
+      // Never-used apps count their idle time from when they were opened.
+      const idle = now - (app.lastActive || app.openedAt || now);
       const eco = app.residency === 'eco' && idle > ECO_GRACE_MS;
       const pressured = this.pressure.level !== 'normal' && idle >= p.freezeMinIdleMinutes * 60000;
       if (asleep || eco || pressured) {

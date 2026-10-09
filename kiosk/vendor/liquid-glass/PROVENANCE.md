@@ -20,3 +20,6 @@ entry.js bundles the V1 renderer and DOM painter as MegaGlass.
 Build: npx esbuild kiosk/vendor/liquid-glass/entry.js --bundle --format=iife \
   --global-name=MegaGlass --minify --outfile=kiosk/vendor/liquid-glass/glass-runtime.js
 Rendering is limited to the visible surface at <=7 FPS; hidden pages do no work.
+Further change to src/dom-content.js: media items (canvas, img, video) are painted
+with their computed CSS `filter` (apps such as Excalidraw invert their canvas in
+dark mode; the raw bitmap would show up white behind the dock).

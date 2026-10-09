@@ -22,7 +22,7 @@ const CSS = `
 #root *{box-sizing:border-box;cursor:none!important}
 button{appearance:none;border:0;background:none;color:inherit;font:inherit;padding:0;touch-action:manipulation}
 svg.ob-icon{width:var(--ob-icon);height:var(--ob-icon);fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.surface{position:relative;isolation:isolate;border-radius:30px;background:var(--ob-glass-tint),var(--ob-glass-fill);border:1px solid var(--ob-glass-edge);box-shadow:var(--ob-glass-inset),var(--ob-glass-shadow);backdrop-filter:blur(var(--ob-glass-blur)) saturate(var(--ob-glass-saturate));-webkit-backdrop-filter:blur(var(--ob-glass-blur)) saturate(var(--ob-glass-saturate))}
+.surface{position:relative;isolation:isolate;border-radius:var(--R,32px);background:var(--ob-glass-tint),var(--ob-glass-fill);border:1px solid var(--ob-glass-edge);box-shadow:var(--ob-glass-inset),var(--ob-glass-shadow);backdrop-filter:blur(var(--ob-glass-blur)) saturate(var(--ob-glass-saturate));-webkit-backdrop-filter:blur(var(--ob-glass-blur)) saturate(var(--ob-glass-saturate))}
 #root.webgl #row .surface{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--ob-glass-tint)}
 #root.glass-off .surface{backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--ob-glass-fill-strong)}
 .strong{background:var(--ob-glass-tint),var(--ob-glass-fill-strong)}
@@ -32,17 +32,26 @@ svg.ob-icon{width:var(--ob-icon);height:var(--ob-icon);fill:none;stroke:currentC
 #indicator.show{opacity:.42}
 #root.open #indicator,#root.asleep #indicator,#root.indicator-never #indicator{opacity:0;pointer-events:none}
 
-#row{position:absolute;left:50%;bottom:18px;display:flex;align-items:flex-end;gap:14px;transform:translate(-50%,calc(100% + 60px));opacity:0;transition:transform var(--ob-dur-slow) var(--ob-spring),opacity var(--ob-dur) var(--ob-ease)}
+#row{position:absolute;left:50%;bottom:18px;display:flex;align-items:flex-end;gap:14px;max-width:calc(100vw - 24px);transform:translate(-50%,calc(100% + 60px));opacity:0;transition:transform var(--ob-dur-slow) var(--ob-spring),opacity var(--ob-dur) var(--ob-ease)}
 #root.open #row{transform:translate(-50%,0);opacity:1;pointer-events:auto}
 #lens{position:absolute;pointer-events:none;z-index:-1}
-#tiles{display:flex;gap:14px}
-.tile-wrap{width:198px;height:104px;padding:7px;border-radius:30px;touch-action:none}
+#tiles{display:flex;gap:14px;flex:none}
+/* Nested corners follow inner = outer - (padding + 1px border). Cells touch the tile edge with
+   the outer radius and each other with a small one. */
+.tile-wrap{--R:32px;--P:8px;--ro:calc(var(--R) - var(--P) - 1px);--ri:9px;width:216px;height:104px;padding:var(--P);touch-action:none}
 .tile-wrap .ob-tile{height:100%;padding:0}
-.tile-wrap .ob-tile .ob-w{border-radius:16px}
-#dock{display:flex;gap:10px;padding:10px;height:104px;align-items:center;touch-action:none}
-.app{position:relative;width:84px;height:84px;border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--ob-glass-pressed);transition:transform var(--ob-dur-fast) var(--ob-ease),background var(--ob-dur-fast)}
+.tile-wrap .ob-tile .ob-w{border-radius:var(--ri)}
+.tile-wrap .ob-tile.size-full .ob-w{border-radius:var(--ro)}
+.tile-wrap .ob-tile.size-half .ob-w:nth-child(1){border-radius:var(--ro) var(--ri) var(--ri) var(--ro)}
+.tile-wrap .ob-tile.size-half .ob-w:nth-child(2){border-radius:var(--ri) var(--ro) var(--ro) var(--ri)}
+.tile-wrap .ob-tile.size-quarter .ob-w:nth-child(1){border-radius:var(--ro) var(--ri) var(--ri) var(--ri)}
+.tile-wrap .ob-tile.size-quarter .ob-w:nth-child(2){border-radius:var(--ri) var(--ro) var(--ri) var(--ri)}
+.tile-wrap .ob-tile.size-quarter .ob-w:nth-child(3){border-radius:var(--ri) var(--ri) var(--ri) var(--ro)}
+.tile-wrap .ob-tile.size-quarter .ob-w:nth-child(4){border-radius:var(--ri) var(--ri) var(--ro) var(--ri)}
+#dock{--R:32px;--P:10px;display:flex;gap:8px;padding:var(--P);height:104px;align-items:center;touch-action:none;min-width:0}
+.app{position:relative;flex:0 1 128px;min-width:80px;width:128px;height:84px;border-radius:calc(32px - 10px - 1px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:var(--ob-glass-pressed);transition:transform var(--ob-dur-fast) var(--ob-ease),background var(--ob-dur-fast)}
 .app .ob-icon{width:34px;height:34px}
-.app span{font-size:12px;font-weight:550;color:var(--ob-text-dim);max-width:76px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app span{font-size:13px;font-weight:550;color:var(--ob-text-dim);max-width:calc(100% - 12px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .app.active{background:var(--ob-glass-selected);box-shadow:inset 0 0 0 1px var(--ob-glass-edge)}
 .app.active span{color:var(--ob-text)}
 .app::after{content:"";position:absolute;top:8px;right:9px;width:7px;height:7px;border-radius:50%;opacity:0;transition:opacity .2s}
@@ -53,31 +62,32 @@ svg.ob-icon{width:var(--ob-icon);height:var(--ob-icon);fill:none;stroke:currentC
 .divider{width:1px;align-self:stretch;margin:10px 2px;background:var(--ob-hair)}
 #voice-btn.on{background:var(--ob-glass-selected);color:var(--ob-err)}
 
-#bubble{position:absolute;left:50%;bottom:146px;transform:translateX(-50%);max-width:min(820px,80vw);padding:14px 22px;border-radius:24px;font-size:20px;line-height:1.35;display:none;pointer-events:auto;text-align:center}
+#bubble{--R:24px;position:absolute;left:50%;bottom:146px;transform:translateX(-50%);max-width:min(820px,80vw);padding:14px 22px;font-size:20px;line-height:1.35;display:none;pointer-events:auto;text-align:center}
 #bubble.show{display:block;animation:pop var(--ob-dur) var(--ob-spring)}
 
-#menu{position:absolute;display:none;min-width:250px;padding:8px;border-radius:24px;pointer-events:auto;z-index:4}
+#menu{--R:24px;position:absolute;display:none;min-width:250px;padding:8px;pointer-events:auto;z-index:4}
 #menu.show{display:block;animation:pop var(--ob-dur) var(--ob-spring)}
 #menu .title{padding:10px 14px 6px;font-size:13px;color:var(--ob-text-dim);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
-#menu button{display:flex;align-items:center;gap:14px;width:100%;min-height:54px;padding:0 14px;border-radius:16px;font-size:18px;text-align:left}
+#menu button{display:flex;align-items:center;gap:14px;width:100%;min-height:54px;padding:0 14px;border-radius:calc(24px - 8px - 1px);font-size:18px;text-align:left}
 #menu button:active{background:var(--ob-glass-pressed)}
 #menu button:disabled{opacity:.4}
 #menu .check{margin-left:auto;opacity:0}#menu .on .check{opacity:1}
 
-#editor{position:absolute;left:50%;bottom:140px;transform:translateX(-50%);width:min(1180px,calc(100vw - 40px));height:min(440px,calc(100vh - 180px));border-radius:34px;display:none;grid-template-columns:220px 1fr;overflow:hidden;pointer-events:auto}
+#editor{position:absolute;left:50%;bottom:140px;transform:translateX(-50%);width:min(1180px,calc(100vw - 40px));height:min(440px,calc(100vh - 180px));--R:34px;display:none;grid-template-columns:220px 1fr;overflow:hidden;pointer-events:auto}
 #editor.show{display:grid;animation:rise var(--ob-dur-slow) var(--ob-spring)}
 #editor nav{padding:18px 12px;border-right:1px solid var(--ob-hair);display:flex;flex-direction:column;gap:4px}
 #editor nav h2{margin:4px 10px 12px;font-size:22px;font-weight:650}
-#editor nav button{min-height:52px;border-radius:16px;padding:0 14px;text-align:left;font-size:17px;color:var(--ob-text-dim)}
+#cats{display:flex;flex-direction:column;gap:4px}
+#editor nav button{width:100%;min-height:52px;border-radius:calc(34px - 12px - 1px);padding:0 14px;text-align:left;font-size:17px;color:var(--ob-text-dim)}
 #editor nav button.on{background:var(--ob-glass-selected);color:var(--ob-text)}
 #editor nav .spacer{flex:1}
 #editor nav .done{background:var(--ob-accent);color:var(--ob-accent-ink);text-align:center;font-weight:650}
 #library{padding:18px;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none}
 #library .hint{color:var(--ob-text-dim);font-size:15px;margin:0 4px 14px;line-height:1.4}
 #library .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:12px}
-.lib{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:20px;background:var(--ob-glass-pressed);touch-action:none}
+.lib{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:calc(34px - 18px - 1px);background:var(--ob-glass-pressed);touch-action:none}
 .lib .preview{height:64px;display:flex}
-.lib .preview .ob-w{flex:1}
+.lib .preview .ob-w{flex:1;border-radius:calc(34px - 18px - 1px - 10px)}
 .lib b{font-size:15px;font-weight:600}
 .lib small{font-size:12.5px;color:var(--ob-text-dim);line-height:1.3}
 #inspector{padding:22px 26px;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none}
@@ -101,16 +111,16 @@ svg.ob-icon{width:var(--ob-icon);height:var(--ob-icon);fill:none;stroke:currentC
 .tile-tools{display:none;gap:10px;align-items:center}
 #root.editing .tile-tools{display:flex}
 .tile-tools button{width:56px;height:56px;border-radius:50%;display:grid;place-items:center}
-#ghost{position:absolute;width:150px;height:62px;display:none;z-index:9;pointer-events:none;border-radius:18px;opacity:.92;transform:translate(-50%,-50%) scale(1.05)}
+#ghost{--R:20px;position:absolute;width:156px;height:68px;padding:6px;display:none;z-index:9;pointer-events:none;opacity:.92;transform:translate(-50%,-50%) scale(1.05)}
 #ghost.show{display:flex}
-#ghost .ob-w{flex:1}
+#ghost .ob-w{flex:1;border-radius:calc(20px - 6px - 1px)}
 .badge-x{position:absolute;top:-6px;left:-6px;width:26px;height:26px;border-radius:50%;background:var(--ob-surface-3);color:var(--ob-text);display:none;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.4);z-index:2}
 .badge-x svg{width:14px;height:14px}
 #root.editing .badge-x{display:grid}
 .ob-w{position:relative}
 
 #prompts{position:absolute;top:22px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:12px;width:min(720px,calc(100vw - 40px))}
-.prompt{padding:20px 22px 18px;border-radius:28px;pointer-events:auto;animation:drop var(--ob-dur-slow) var(--ob-spring)}
+.prompt{--R:28px;padding:20px 22px 18px;pointer-events:auto;animation:drop var(--ob-dur-slow) var(--ob-spring)}
 .prompt p{margin:0 0 14px;font-size:19px;line-height:1.4;display:flex;gap:14px}
 .prompt .ob-icon{color:var(--ob-warn);flex:none;margin-top:2px}
 .prompt .choices{display:flex;gap:10px;justify-content:flex-end}
@@ -119,15 +129,23 @@ svg.ob-icon{width:var(--ob-icon);height:var(--ob-icon);fill:none;stroke:currentC
 .prompt .timer{height:3px;border-radius:2px;background:var(--ob-hair);margin-top:14px;overflow:hidden}
 .prompt .timer i{display:block;height:100%;background:var(--ob-text-dim);transform-origin:left;animation:countdown linear forwards}
 #toasts{position:absolute;top:22px;right:22px;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
-.toast{display:flex;align-items:center;gap:12px;padding:12px 18px;border-radius:20px;font-size:16px;animation:drop var(--ob-dur) var(--ob-spring);max-width:520px}
+.toast{--R:20px;display:flex;align-items:center;gap:12px;padding:12px 18px;font-size:16px;animation:drop var(--ob-dur) var(--ob-spring);max-width:520px}
 
-#keyboard{position:absolute;left:50%;bottom:16px;transform:translate(-50%,calc(100% + 40px));width:min(1240px,calc(100vw - 32px));padding:12px;border-radius:30px;pointer-events:auto;transition:transform var(--ob-dur) var(--ob-ease);touch-action:none}
+#keyboard{--kb:1;--R:calc(30px * var(--kb));--P:calc(12px * var(--kb));position:absolute;left:50%;bottom:16px;transform:translate(-50%,calc(100% + 40px));width:min(calc(1240px * var(--kb)),calc(100vw - 32px));padding:var(--P);pointer-events:auto;transition:transform var(--ob-dur) var(--ob-ease);touch-action:none}
 #keyboard.show{transform:translate(-50%,0)}
 #root.open #keyboard.show{transform:translate(-50%,calc(-100% - 140px))}
-#keyboard .krow{display:flex;gap:8px;justify-content:center;margin:8px 0}
-#keyboard button{flex:1 1 0;max-width:96px;height:66px;border-radius:16px;background:var(--ob-glass-pressed);font-size:24px;font-weight:450}
-#keyboard button.wide{max-width:150px;flex-grow:1.6;font-size:17px}
-#keyboard button.space{max-width:520px;flex-grow:6}
+#keyboard.resizing{transition:none}
+#keyboard .krow{display:flex;gap:calc(8px * var(--kb));justify-content:center;margin:calc(8px * var(--kb)) 0}
+#keyboard button{flex:1 1 0;max-width:calc(96px * var(--kb));height:calc(66px * var(--kb));border-radius:calc(30px * var(--kb) - 12px * var(--kb) - 1px);background:var(--ob-glass-pressed);font-size:calc(24px * var(--kb));font-weight:450}
+#keyboard button.wide{max-width:calc(150px * var(--kb));flex-grow:1.6;font-size:calc(17px * var(--kb))}
+#keyboard button.space{max-width:calc(520px * var(--kb));flex-grow:6}
+.kb-corner{position:absolute;width:44px;height:44px;touch-action:none;z-index:2}
+.kb-corner::after{content:"";position:absolute;width:16px;height:16px;border:2.5px solid var(--ob-text-dim);opacity:.55;border-radius:0}
+.kb-corner[data-corner="tl"]{left:-24px;top:-24px}.kb-corner[data-corner="tl"]::after{left:5px;top:5px;border-right:0;border-bottom:0;border-top-left-radius:9px}
+.kb-corner[data-corner="tr"]{right:-24px;top:-24px}.kb-corner[data-corner="tr"]::after{right:5px;top:5px;border-left:0;border-bottom:0;border-top-right-radius:9px}
+.kb-corner[data-corner="bl"]{left:-24px;bottom:-24px}.kb-corner[data-corner="bl"]::after{left:5px;bottom:5px;border-right:0;border-top:0;border-bottom-left-radius:9px}
+.kb-corner[data-corner="br"]{right:-24px;bottom:-24px}.kb-corner[data-corner="br"]::after{right:5px;bottom:5px;border-left:0;border-top:0;border-bottom-right-radius:9px}
+.kb-corner.drag::after{opacity:1;border-color:var(--ob-accent)}
 #keyboard button.on{background:var(--ob-accent);color:var(--ob-accent-ink)}
 #keyboard button:active{background:var(--ob-glass-selected);transform:scale(.96)}
 
@@ -593,8 +611,32 @@ const mount = () => {
   };
   let layer = 'lower', shiftOnce = false, keyboardTarget = null;
   const SPECIAL = { '⌫': 'Backspace', '⏎': 'Enter', '←': 'ArrowLeft', '→': 'ArrowRight' };
+  // The four corner grips resize the keyboard (it stays centred, keys scale with it).
+  const KB_BASE = 1240, KB_MIN = 0.55, KB_MAX = 1.6;
+  const kbMax = () => Math.min(KB_MAX, (innerWidth - 32) / KB_BASE);
+  const applyKeyboardScale = value => keyboard.style.setProperty('--kb', String(Math.max(KB_MIN, Math.min(kbMax(), value))));
+  let resize = null;
+  const corners = ['tl', 'tr', 'bl', 'br'].map(corner => {
+    const grip = document.createElement('i'); grip.className = 'kb-corner'; grip.dataset.corner = corner;
+    on(grip, 'pointerdown', event => {
+      event.preventDefault(); event.stopPropagation();
+      resize = { id: event.pointerId, grip };
+      grip.setPointerCapture(event.pointerId); grip.classList.add('drag'); keyboard.classList.add('resizing');
+    });
+    on(grip, 'pointermove', event => {
+      if (resize?.id !== event.pointerId) return;
+      applyKeyboardScale((2 * Math.abs(event.clientX - innerWidth / 2)) / KB_BASE);
+    });
+    const end = event => {
+      if (resize?.id !== event.pointerId) return;
+      resize = null; grip.classList.remove('drag'); keyboard.classList.remove('resizing');
+      void bridge('config-patch', { patch: { appearance: { keyboardScale: Math.round(Number(keyboard.style.getPropertyValue('--kb')) * 100) / 100 } } });
+    };
+    on(grip, 'pointerup', end); on(grip, 'pointercancel', end);
+    return grip;
+  });
   const renderKeyboard = () => {
-    keyboard.replaceChildren(...LAYOUTS[layer].map(keys => {
+    keyboard.replaceChildren(...corners, ...LAYOUTS[layer].map(keys => {
       const line = document.createElement('div'); line.className = 'krow';
       for (const key of keys) {
         const button = document.createElement('button'); button.textContent = key === ' ' ? 'Leerzeichen' : key;
@@ -671,7 +713,7 @@ const mount = () => {
       if (crop.width !== cw || crop.height !== ch) { crop.width = cw; crop.height = ch; }
       const shapes = surfaces.map((element, index) => {
         const box = element.getBoundingClientRect();
-        return { id: 's' + index, shape: 'rect', x: box.left - rowBox.left + margin, y: box.top - rowBox.top + margin, width: box.width, height: box.height, radius: 30 };
+        return { id: 's' + index, shape: 'rect', x: box.left - rowBox.left + margin, y: box.top - rowBox.top + margin, width: box.width, height: box.height, radius: parseFloat(getComputedStyle(element).borderTopLeftRadius) || 32 };
       });
       const signature = JSON.stringify(shapes);
       if (lens.width !== cw || lens.height !== ch || glass.signature !== signature) { glass.renderer.resize(cw, ch, 1); glass.renderer.setElements(shapes, false); glass.signature = signature; }
@@ -683,11 +725,19 @@ const mount = () => {
       const layers = gev ? [gev, ...['scope-mask', 'world-overlay-canvas'].map(id => document.getElementById(id)).filter(Boolean)]
         : [...document.querySelectorAll('canvas')].filter(canvas => canvas.width > 200 && canvas.height > 200);
       glass.kind = layers.length ? 'live-canvas+dom' : 'dom-repaint';
+      const stages = window.__openboardDebugGlass ? [] : null;
+      const probe = label => { if (stages) stages.push([label, Array.from(cropContext.getImageData(Math.round(cw / 2), 20, 1, 1).data)]); };
+      probe('base');
       for (const layer of layers) {
         const box = layer.getBoundingClientRect(), style = getComputedStyle(layer);
         if (!box.width || !box.height || style.display === 'none' || style.visibility === 'hidden') continue;
         cropContext.globalAlpha = Number(style.opacity) || 0;
-        try { cropContext.drawImage(layer, (region.x - box.left) * layer.width / box.width, (region.y - box.top) * layer.height / box.height, cw * layer.width / box.width, ch * layer.height / box.height, 0, 0, cw, ch); } catch { /* tainted or lost context */ }
+        const sx = (region.x - box.left) * layer.width / box.width, sy = (region.y - box.top) * layer.height / box.height, sw = cw * layer.width / box.width, sh = ch * layer.height / box.height;
+        // Apps may restyle a canvas with CSS (Excalidraw inverts it in dark mode); sample what is shown.
+        cropContext.filter = style.filter && style.filter !== 'none' ? style.filter : 'none';
+        try { cropContext.drawImage(layer, sx, sy, sw, sh, 0, 0, cw, ch); } catch { /* tainted or lost context */ }
+        cropContext.filter = 'none';
+        probe(`${layer.className || layer.id} filter=${style.filter}`);
       }
       cropContext.globalAlpha = 1;
       if (MegaGlass.paintPageContent) {
@@ -696,6 +746,7 @@ const mount = () => {
         MegaGlass.paintPageContent(cropContext, region, null);
         cropContext.setTransform(1, 0, 0, 1, 0, 0);
       }
+      probe('after-dom'); if (stages) glass.stages = stages;
       const frostKey = `${frostOf()}|${root.dataset.obTheme}`;
       if (frostKey !== appliedFrost) { glass.renderer.setMaterial(materialFor(frostOf()), false); appliedFrost = frostKey; }
       glass.renderer.setBackdrop(crop, { update: 'live', autoStart: false, shouldRender: false });
@@ -784,6 +835,7 @@ const mount = () => {
   const update = next => {
     state = next;
     root.dataset.obTheme = next.theme || 'dark';
+    if (!resize) applyKeyboardScale(next.appearance?.keyboardScale ?? 1);
     root.style.setProperty('--ob-glass-blur', `${Math.round(8 + frostOf() * 28)}px`);
     root.classList.toggle('indicator-never', next.dock?.indicator === 'never');
     indicator.classList.toggle('show', next.dock?.indicator === 'always');
@@ -807,10 +859,13 @@ const mount = () => {
   window.__openboard = {
     version: SHELL_VERSION, update, event: onEvent, dispose,
     diagnostics: () => ({ version: SHELL_VERSION, open: isOpen(), editing, asleep: root.classList.contains('asleep'), apps: dock.querySelectorAll('[data-app]').length,
-      tiles: tilesEl.children.length, keyboard: keyboard.classList.contains('show'), voice: !!voiceSession,
+      tiles: tilesEl.children.length, keyboard: keyboard.classList.contains('show'), keyboardRect: JSON.parse(JSON.stringify(keyboard.getBoundingClientRect())), keyboardScale: Number(keyboard.style.getPropertyValue('--kb')) || 1, voice: !!voiceSession,
       dock: JSON.parse(JSON.stringify(dock.getBoundingClientRect())), indicator: JSON.parse(JSON.stringify(indicator.getBoundingClientRect())),
       gesture: { ...gesture }, glassFrames: glass.frames, glassError: glass.error, glassEngine: typeof MegaGlass !== 'undefined' ? MegaGlass.IOR_RENDERER : null, backdropKind: glass.kind }),
     open, close, openEditor, closeEditor,
+    // Debug aid: the image handed to the glass renderer (what the lens refracts).
+    glassCrop: () => crop.toDataURL('image/png'),
+    glassStages: () => glass.stages || null,
   };
   window.__megaKiosk = true; // legacy marker for older tooling
 

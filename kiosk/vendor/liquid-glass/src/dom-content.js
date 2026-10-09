@@ -372,6 +372,10 @@ export function paintPageContent(context, region, host) {
       if (item.type === 'text') {
         paintText(context, item, offsetX, offsetY, region);
       } else if (item.type === 'media') {
+        // Kiosk adaptation: apps restyle canvases with CSS filters (Excalidraw inverts its canvas in
+        // dark mode); paint what is shown, not the raw bitmap.
+        const filter = getComputedStyle(item.element).filter;
+        if (filter && filter !== 'none') context.filter = filter;
         paintMedia(context, { element: item.element }, region);
       } else {
         settled = paintCssBackground(context, item.element, region) && settled;

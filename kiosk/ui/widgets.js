@@ -27,6 +27,7 @@ var OBWidgets = (() => {
     { type: 'mqtt.value', kind: 'display', category: 'Verknüpfungen', name: 'MQTT-Wert', icon: 'mqtt', description: 'Beliebiger Wert aus einem MQTT-Topic (z. B. Home Assistant)', options: [{ key: 'label', label: 'Name', type: 'text', default: 'Wert' }, { key: 'topic', label: 'Topic', type: 'text', default: '' }, { key: 'jsonPath', label: 'JSON-Feld (optional)', type: 'text', default: '' }, { key: 'unit', label: 'Einheit', type: 'text', default: '' }, { key: 'icon', label: 'Symbol', type: 'icon', default: 'mqtt' }] },
     { type: 'action.sleep', kind: 'button', category: 'Steuerung', name: 'Ruhezustand', icon: 'sleep', description: 'Bildschirm schwarz, Apps pausieren', options: [] },
     { type: 'action.theme', kind: 'button', category: 'Steuerung', name: 'Design', icon: 'theme', description: 'Dunkel, Hell, Automatisch', options: [] },
+    { type: 'action.orientation', kind: 'button', category: 'Steuerung', name: 'Ausrichtung', icon: 'rotate', description: 'Zwischen Quer- und Hochformat wechseln', options: [] },
     { type: 'action.reload', kind: 'button', category: 'Steuerung', name: 'Neu laden', icon: 'reload', description: 'Aktuelle App neu laden', options: [] },
     { type: 'action.voice', kind: 'button', category: 'Steuerung', name: 'Sprechen', icon: 'mic', description: 'Sprachsteuerung (GEV: Gemini, sonst ASTRA)', options: [] },
     { type: 'action.performance', kind: 'button', category: 'Steuerung', name: 'Leistung', icon: 'bolt', description: 'Eco, Ausgewogen, Maximal', options: [] },
@@ -120,6 +121,7 @@ var OBWidgets = (() => {
         const t = s.appearance?.theme || 'dark';
         return { cls: 'button', html: `${ICON(t === 'light' ? 'sun' : t === 'auto' ? 'theme' : 'moon')}<span class="label">${t === 'light' ? 'Hell' : t === 'auto' ? 'Auto' : 'Dunkel'}</span>` };
       }
+      case 'action.orientation': { const o = s.display?.orientation || 'landscape'; return { cls: 'button', html: `${ICON('rotate')}<span class="label">${o.startsWith('portrait') ? 'Hochkant' : 'Quer'}</span>` }; }
       case 'action.reload': return { cls: 'button', html: `${ICON('reload')}<span class="label">Neu laden</span>` };
       case 'action.voice': return { cls: 'button' + (s.voice?.listening ? ' on' : ''), html: `${ICON(s.voice?.listening ? 'mic-off' : 'mic')}<span class="label">${s.voice?.listening ? 'Stopp' : 'Sprechen'}</span>` };
       case 'action.performance': {

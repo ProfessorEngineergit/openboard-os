@@ -402,3 +402,23 @@ body[data-voice="listening"] .chips,body[data-voice="listening"] .ask{opacity:.3
   .orb-halo,.al-glow,.al-kicker .ob-icon,.thinking-dots i{animation:none}
   .card.enter,.reply{animation:none}
 }
+
+/* ------------------------------------------------------------------------------------------ */
+/* Portrait (1080×1920): one column, weather below the clock, compact composer                 */
+/* ------------------------------------------------------------------------------------------ */
+@media (orientation:portrait){
+  :root{--pad-x:44px;--orb:104px;--composer-bottom:150px}
+  #glance{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);row-gap:36px;padding:40px var(--pad-x) 330px;overflow:hidden}
+  .g-clock{font-size:calc(var(--ob-t-display) * 1.5)}
+  .g-date{font-size:38px;margin-top:20px}
+  .g-briefing{max-width:none}
+  .g-events{max-width:none}
+  .g-right>.wx{min-height:0}
+  .wx-day{max-height:60px}
+  #thread{padding-bottom:420px}
+  .turn.current.split{grid-template-columns:minmax(0,1fr);gap:32px}
+  .cmp-row{grid-template-columns:auto minmax(0,1fr);gap:24px}
+  .ask{justify-self:stretch;width:100%}
+  .chips{display:none}
+  #glance.no-weather .g-events{width:100%;max-width:760px}
+}

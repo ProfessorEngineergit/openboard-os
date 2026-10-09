@@ -15,7 +15,7 @@ export function defaults() {
     version: 2,
     apps: structuredClone(BUILTIN_APPS),
     startApp: 'gev',
-    appearance: { theme: 'dark', lightFrom: '07:00', darkFrom: '19:30', glass: 'webgl', frost: 0.55, accent: '#f4f5f8' },
+    appearance: { theme: 'dark', lightFrom: '07:00', darkFrom: '19:30', glass: 'webgl', frost: 0.55, keyboardScale: 1, accent: '#f4f5f8' },
     dock: {
       order: BUILTIN_APPS.map(app => app.id), autoHideSeconds: 6, indicator: 'touch',
       tiles: [
@@ -28,7 +28,7 @@ export function defaults() {
         { id: 't2', items: [{ id: 'w5', type: 'info.clock', options: {} }] },
       ],
     },
-    display: { sleepMode: 'black', useDdc: false, idleSleepMinutes: 0, schedule: { enabled: false, sleepAt: '23:30', wakeAt: '06:45' } },
+    display: { orientation: 'landscape', sleepMode: 'black', useDdc: false, idleSleepMinutes: 0, schedule: { enabled: false, sleepAt: '23:30', wakeAt: '06:45' } },
     performance: {
       mode: 'balanced', elevatedCpu: 75, criticalCpu: 92, sustainSeconds: 20, memoryFloorMB: 600,
       terminate: 'ask', askTimeoutSeconds: 30, askDefault: 'keep', terminateMinIdleMinutes: 20, freezeMinIdleMinutes: 3,
@@ -42,6 +42,7 @@ export function defaults() {
   };
 }
 
+export const ORIENTATIONS = ['landscape', 'portrait', 'landscape-flipped', 'portrait-flipped'];
 const SECRET_PATHS = [['astra', 'token'], ['mqtt', 'password'], ['gemini', 'key']];
 const LEGACY_URLS = { 'http://localhost:4180/astra': 'http://localhost:4180/apps/astra/', 'http://localhost:4180/whiteboard': 'http://localhost:4180/apps/board/' };
 
@@ -118,6 +119,7 @@ export function validate(config) {
   oneOf(config.appearance.theme, ['dark', 'light', 'auto'], 'Design');
   oneOf(config.appearance.glass, ['webgl', 'css', 'off'], 'Glas');
   number(config.appearance.frost, 0, 1, 'Milchglas-Stärke');
+  number(config.appearance.keyboardScale, 0.5, 1.6, 'Tastaturgröße');
   if (!TIME.test(config.appearance.lightFrom) || !TIME.test(config.appearance.darkFrom)) throw new Error('Uhrzeit im Format HH:MM');
   oneOf(config.dock.indicator, ['always', 'touch', 'never'], 'Indikator');
   number(config.dock.autoHideSeconds, 2, 120, 'Ausblenden nach');
@@ -127,6 +129,7 @@ export function validate(config) {
     for (const item of tile.items) if (typeof item.type !== 'string' || typeof item.id !== 'string') throw new Error('Ungültiges Widget');
   }
   oneOf(config.display.sleepMode, ['black', 'dpms'], 'Ruhemodus');
+  oneOf(config.display.orientation, ORIENTATIONS, 'Ausrichtung');
   number(config.display.idleSleepMinutes, 0, 1440, 'Automatischer Ruhezustand');
   if (!TIME.test(config.display.schedule.sleepAt) || !TIME.test(config.display.schedule.wakeAt)) throw new Error('Uhrzeit im Format HH:MM');
   const p = config.performance;

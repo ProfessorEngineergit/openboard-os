@@ -57,8 +57,9 @@ Die Datei wird beim Start aus Version 1 migriert. Geheimnisse (`*.key`, `*.token
     { "id": "settings", "name": "Einstellungen", "url": "http://localhost:4180/apps/settings/", "icon": "settings", "builtin": true, "residency": "eco", "weight": "light" }
   ],
   "startApp": "gev",
-  "appearance": { "theme": "dark", "lightFrom": "07:00", "darkFrom": "19:30", "glass": "webgl", "accent": "#f4f5f8" },
+  "appearance": { "theme": "dark", "lightFrom": "07:00", "darkFrom": "19:30", "glass": "webgl", "frost": 0.55, "keyboardScale": 1, "accent": "#f4f5f8" },
   // theme: "dark" | "light" | "auto" (nach Uhrzeit); glass: "webgl" | "css" | "off"
+  // frost 0..1: Unschärfe + Tönung hinter dem Glas (Brechung am Rand bleibt); keyboardScale 0.5..1.6: Größe der Bildschirmtastatur (Ecken ziehen)
   "dock": {
     "order": ["gev", "home", "astra", "board", "settings"],
     "autoHideSeconds": 6, "indicator": "touch",   // "always" | "touch" | "never"
@@ -70,9 +71,11 @@ Die Datei wird beim Start aus Version 1 migriert. Geheimnisse (`*.key`, `*.token
       { "id": "t2", "items": [ { "id": "w5", "type": "info.clock" } ] }
     ]
   },
-  "display": { "sleepMode": "black", "useDdc": false, "idleSleepMinutes": 0,
+  "display": { "orientation": "landscape", "sleepMode": "black", "useDdc": false, "idleSleepMinutes": 0,
                "schedule": { "enabled": false, "sleepAt": "23:30", "wakeAt": "06:45" } },
   // sleepMode: "black" (schwarzes Overlay + Apps einfrieren) | "dpms" (Signal aus)
+  // orientation: "landscape" | "portrait" | "landscape-flipped" | "portrait-flipped" – dreht Bild (xrandr) und Touch
+  //   (Koordinatenmatrix) über scripts/reconnect-display.py; Wunsch liegt in ~/.local/state/openboard/orientation
   "performance": {
     "mode": "balanced",                 // "eco" | "balanced" | "max"
     "elevatedCpu": 75, "criticalCpu": 92, "sustainSeconds": 20,
@@ -162,7 +165,7 @@ Typen (`kiosk/ui/widgets.js` ist die Quelle, `GET /api/local/widgets/catalog` li
 | `metric.app` | Anzeige | stärkster Verbraucher oder `app` |
 | `info.clock` `info.date` `info.weather` `info.next-event` `info.astra` `info.update` | Anzeige | `format` |
 | `mqtt.value` | Anzeige | `topic`, `label`, `unit`, `jsonPath` |
-| `action.sleep` `action.theme` `action.reload` `action.voice` `action.performance` | Knopf | – |
+| `action.sleep` `action.theme` `action.reload` `action.voice` `action.performance` `action.orientation` | Knopf | – |
 | `action.volume` `action.brightness` | Knopf/Regler | `step` |
 | `action.app` | Knopf | `app` |
 | `action.mqtt` | Knopf | `name`, `icon`, `payload` → erscheint in Home Assistant als Geräte-Auslöser |
@@ -282,6 +285,7 @@ Discovery unter `<discoveryPrefix>/<component>/<nodeId>/<object>/config`; ein Ge
 | App | `select` | aktive App |
 | Leistungsmodus | `select` | eco / balanced / max |
 | Design | `select` | dark / light / auto |
+| Ausrichtung | `select` | landscape / portrait / landscape-flipped / portrait-flipped |
 | Sagen | `text` | Text → ASTRA-TTS auf dem Display |
 | Neu laden, Browser neu starten | `button` | – |
 | CPU, GPU, RAM, Temperatur, aktive App, letzte Berührung, Version | `sensor` | – |

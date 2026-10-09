@@ -2,6 +2,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { resolve } from 'node:path';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { STATE_DIR } from './updates.mjs';
 
 const run = promisify(execFile);
 const X11 = () => ({ ...process.env, DISPLAY: process.env.DISPLAY || ':0', XAUTHORITY: process.env.XAUTHORITY || `${process.env.HOME}/.Xauthority` });
@@ -69,6 +71,15 @@ export class SystemControl {
     if (await tryRun('ddcutil', ['setvcp', '10', String(target)], { timeout: 6000 }) == null) throw new Error('DDC/CI-Befehl fehlgeschlagen');
     this.brightness = target;
     return target;
+  }
+
+  // Writes the wish to the state file and lets the display watcher apply it
+  // (xrandr rotation + touch matrix live in scripts/reconnect-display.py).
+  async setOrientation(orientation, { apply = true } = {}) {
+    await mkdir(STATE_DIR, { recursive: true });
+    await writeFile(resolve(STATE_DIR, 'orientation'), orientation);
+    if (!apply) return;
+    await run('python3', [resolve(this.base, 'scripts/reconnect-display.py'), '--once'], { timeout: 20000, env: { ...X11(), OPENBOARD_STATE_DIR: STATE_DIR } }).catch(error => { throw new Error(`Drehen fehlgeschlagen: ${error.stderr?.trim() || error.message}`); });
   }
 
   async service(action, unit) {

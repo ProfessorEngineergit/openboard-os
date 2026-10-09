@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { createRouter, openStream, HttpError, PORT } from './lib/router.mjs';
 import { serveDirectory } from './lib/static.mjs';
-import { ConfigStore, effectiveTheme, redact, validateUrl } from './lib/config.mjs';
+import { ConfigStore, effectiveTheme, redact, validateUrl, ORIENTATIONS } from './lib/config.mjs';
 import { Metrics } from './lib/metrics.mjs';
 import { SystemControl } from './lib/system.mjs';
 import { Updates } from './lib/updates.mjs';
@@ -105,6 +105,7 @@ const mqtt = new MqttBridge({
     app: name => { const app = config().apps.find(entry => entry.name === name || entry.id === name); if (app) return activate(app.id); },
     performance: mode => ['eco', 'balanced', 'max'].includes(mode) && store.patch({ performance: { mode } }),
     theme: theme => ['dark', 'light', 'auto'].includes(theme) && store.patch({ appearance: { theme } }),
+    orientation: value => ORIENTATIONS.includes(value) && store.patch({ display: { orientation: value } }),
     say: text => speak(text),
     reload: () => apps.active && apps.reload(apps.active),
     restartBrowser: () => system.service('restart', 'openboard-browser.service'),
@@ -119,7 +120,7 @@ function state() {
   return {
     version: updates.version, connected: apps.connected, active: apps.active,
     theme: effectiveTheme(c.appearance), appearance: c.appearance, dock: c.dock, startApp: c.startApp,
-    display: { asleep: display.asleep, since: display.since, mode: c.display.sleepMode },
+    display: { asleep: display.asleep, since: display.since, mode: c.display.sleepMode, orientation: c.display.orientation },
     apps: apps.snapshot(),
     pressure: perf.pressure.level,
     performance: perf.state(),
@@ -141,7 +142,7 @@ function publish() {
 }
 const mqttContext = () => ({
   asleep: display.asleep, appName: config().apps.find(app => app.id === apps.active)?.name, performance: config().performance.mode,
-  theme: config().appearance.theme, metrics: metrics.latest, pressure: perf.pressure.level, lastTouch: display.lastActivity,
+  theme: config().appearance.theme, orientation: config().display.orientation, metrics: metrics.latest, pressure: perf.pressure.level, lastTouch: display.lastActivity,
   version: updates.version, astra: astra.connected, updateAvailable: updateStatus.available, apps: config().apps.filter(app => app.enabled),
 });
 
@@ -239,6 +240,11 @@ async function runWidget(item, step) {
       await store.patch({ performance: { mode } });
       return { toast: { eco: 'Leistung: Eco – Apps im Hintergrund werden früher pausiert', balanced: 'Leistung: Ausgewogen', max: 'Leistung: Maximal – nichts wird beendet' }[mode], icon: 'bolt' };
     }
+    case 'action.orientation': {
+      const orientation = config().display.orientation.startsWith('landscape') ? 'portrait' : 'landscape';
+      await store.patch({ display: { orientation } });
+      return { toast: orientation === 'portrait' ? 'Hochformat' : 'Querformat', icon: 'rotate' };
+    }
     case 'action.reload': if (apps.active) await apps.reload(apps.active); return {};
     case 'action.app': await activate(options.app); return {};
     case 'action.volume': {
@@ -270,7 +276,7 @@ async function runWidget(item, step) {
 
 // Restricted config changes from inside app pages (dock editor, quick toggles).
 function checkShellPatch(patch) {
-  const allowed = { dock: ['tiles', 'order'], appearance: ['theme'], performance: ['mode'] };
+  const allowed = { dock: ['tiles', 'order'], appearance: ['theme', 'keyboardScale'], performance: ['mode'] };
   for (const [section, value] of Object.entries(patch || {})) {
     if (!allowed[section] || typeof value !== 'object') throw new Error('Nicht erlaubt');
     for (const key of Object.keys(value)) if (!allowed[section].includes(key)) throw new Error('Nicht erlaubt');
@@ -324,6 +330,7 @@ store.on('change', (next, previous) => {
   if (JSON.stringify(next.astra) !== JSON.stringify(previous.astra)) astra.restart();
   if (JSON.stringify(next.mqtt) !== JSON.stringify(previous.mqtt)) mqtt.connect(mqttContext);
   else if (JSON.stringify(next.dock) !== JSON.stringify(previous.dock) || JSON.stringify(next.apps) !== JSON.stringify(previous.apps)) { mqtt.publishDiscovery(mqttContext()); mqtt.syncValueTopics(); }
+  if (next.display.orientation !== previous.display.orientation) system.setOrientation(next.display.orientation).then(() => log(`Ausrichtung: ${next.display.orientation}`), error => { log(error.message); void apps.event({ type: 'toast', text: error.message, icon: 'warning' }); });
   if (JSON.stringify(next.performance.gev) !== JSON.stringify(previous.performance.gev) && !perf.thermalThrottled) void apps.setGevQuality(next.performance.gev.fps, next.performance.gev.resolutionScale);
   // App URL changes reopen that app; removed or disabled apps close.
   for (const app of previous.apps) {
@@ -457,6 +464,7 @@ const server = http.createServer((req, res) => { void router.handle(req, res); }
 server.listen(PORT, '127.0.0.1', () => log(`OpenBoard ${updates.version} auf 127.0.0.1:${PORT}`));
 
 // ---------- Background loops ----------
+await system.setOrientation(config().display.orientation, { apply: false }).catch(() => {});
 astra.start();
 mqtt.connect(mqttContext);
 await perf.start();
