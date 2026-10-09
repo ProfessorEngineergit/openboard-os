@@ -13,7 +13,7 @@ blocked_prefixes = ('logs/', 'backups/', 'kiosk/data/', 'gods-eye-view/', 'vendo
 # Generated third-party bundles (minified) contain random strings that look like keys.
 generated_prefixes = ('kiosk/apps/board/dist/', 'kiosk/vendor/liquid-glass/glass-runtime.js', 'kiosk/ui/fonts/')
 blocked_names = {'kiosk/config.json', 'kiosk/api-token', '.env'}
-public_images = {'docs/screenshots/glass-panel.png', 'docs/screenshots/launcher.png', 'docs/screenshots/whiteboard.png'}
+public_images = {'docs/screenshots/dock.png', 'docs/screenshots/astra.png', 'docs/screenshots/board.png', 'docs/screenshots/settings.png'}
 patterns = {
     'provider key': re.compile(r'(?:AIza[\w-]{30,}|sk-[\w-]{20,}|gh[pousr]_[A-Za-z0-9]{20,})'),
     'private key': re.compile(r'BEGIN [A-Z ]*PRIVATE KEY'),

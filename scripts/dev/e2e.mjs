@@ -301,6 +301,41 @@ try {
       await shot(page, name);
     });
   }
+  // Documentation images: node scripts/dev/e2e.mjs --docs docs/screenshots (synthetic fixtures only).
+  if (process.argv.includes('--docs')) {
+    const docs = resolve(process.argv[process.argv.indexOf('--docs') + 1]);
+    await mkdir(docs, { recursive: true });
+    await api('/api/local/config', { method: 'PATCH', body: { appearance: { theme: 'dark' } } });
+    await step('documentation screenshots', async () => {
+      const grab = async (id, prefix, file, prepare) => {
+        await api(`/api/local/apps/${id}/activate`, { method: 'POST' });
+        const page = await pageFor(prefix);
+        await page.evaluate(() => window.__openboard?.close());
+        if (prepare) await prepare(page);
+        await sleep(1800);
+        await page.screenshot({ path: `${docs}/${file}` });
+        return page;
+      };
+      await grab('gev', 'http://localhost:4173/', 'dock.png', async page => { await page.evaluate(() => window.__openboard.open()); await sleep(600); });
+      await grab('astra', `${APP}/apps/astra/`, 'astra.png');
+      await grab('board', `${APP}/apps/board/`, 'board.png', async page => {
+        await page.waitForFunction(() => !!window.__openboardBoard, { timeout: 20000 });
+        await page.evaluate(async () => {
+          const box = (x, y, w, h, text, color) => ({ type: 'rectangle', x, y, width: w, height: h, backgroundColor: color, fillStyle: 'solid', roundness: { type: 3 }, label: { text, fontSize: 28 } });
+          await window.__openboardBoard.apply({ op: 'add_elements', elements: [
+            { type: 'text', x: 320, y: 150, text: 'Sprint-Planung', fontSize: 40 },
+            box(320, 280, 280, 120, 'Idee', '#a5d8ff'),
+            { type: 'ellipse', x: 820, y: 262, width: 280, height: 156, backgroundColor: '#b2f2bb', fillStyle: 'solid', label: { text: 'Plan', fontSize: 28 } },
+            box(1320, 280, 300, 120, 'Umsetzung', '#ffec99'),
+            { type: 'arrow', x: 600, y: 340, width: 220, height: 0, points: [[0, 0], [220, 0]] },
+            { type: 'arrow', x: 1100, y: 340, width: 220, height: 0, points: [[0, 0], [220, 0]] },
+          ] });
+        });
+        await sleep(1200);
+      });
+      await grab('settings', `${APP}/apps/settings/`, 'settings.png');
+    });
+  }
   await step('npm run verify (live check script) passes against the running system', async () => {
     controller.kill(); await sleep(1500);
     const verifier = spawn(process.execPath, [resolve(repo, 'kiosk/server.mjs'), '--verify'], {
