@@ -1,9 +1,9 @@
 (() => {
-  if (window.top !== window || window.__megaKioskVersion === 4.1) return;
+  if (window.top !== window || window.__megaKioskVersion === 5.1) return;
   window.__megaKioskDispose?.();
   document.getElementById('mega-display-controls')?.remove();
   window.__megaKiosk = true;
-  window.__megaKioskVersion = 4.1;
+  window.__megaKioskVersion = 5.1;
   const send = value => window.megaKiosk(JSON.stringify(value));
   const icon = (name) => {
     const paths = {
@@ -39,8 +39,8 @@
       #dock.open #panel{display:block;animation:reveal .22s cubic-bezier(.22,.8,.25,1)}#dock.open #handle{display:none}
       @keyframes reveal{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
       @media(prefers-reduced-motion:reduce){#dock.open #panel{animation:none}}
-      .lens{position:absolute;inset:0;z-index:-2;pointer-events:none;opacity:1}
-      #panel:after,#handle:after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(135deg,#17212e3d,#0e17232e 45%,#0a111d52);pointer-events:none}
+      .lens{position:absolute;z-index:-2;pointer-events:none;opacity:1}
+      #panel:after,#handle:after{content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(135deg,#17212e22,#0e17231c 45%,#0a111d33);pointer-events:none}
       #bar{height:48px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
       #grip{display:flex;align-items:center;gap:10px;flex:1;height:48px;padding-left:10px;font-size:12px;font-weight:600;letter-spacing:1.6px;opacity:.78;touch-action:none}
 
@@ -61,41 +61,56 @@
     const handle = $('handle');
     let handleLayout={x:0,y:0}, drag, suppressClickUntil=0;
     let timer, state, mic, audio, processor, source, playbackTime = 0, tabSignature='', layoutSignature='';
-    let frameCount=0, glassError='', lastGlass=0, detachRender;
+    let lastDOM=0;
+    let frameCount=0, glassError='', lastGlass=0, detachRender, domTimer, backdropKind='';
+    const glassMaterial={ior:1.5,dispersion:.035,bevel:18,height:22,refractScale:2.4,meniscus:1,blurPlateau:2.5,blurRim:1,specular:.36,fresnel:1,saturation:1.18,tintAmount:.025,tintColor:[.10,.15,.21],tintAdapt:0,shadow:0,edgeLine:.22};
     const renderers=new Map();
     const crop=document.createElement('canvas'), cropContext=crop.getContext('2d');
     const paintGlass = (force=false) => {
       if(document.hidden || (!force && performance.now()-lastGlass<140)) return;
       lastGlass=performance.now();
       const original=window.__godsEyeView?.viewer?.scene?.canvas || document.getElementById('board');
-      if(!original) return;
       try {
         const expanded=dock.classList.contains('open');
         const element=expanded?$('panel'):$('handle');
         const lens=expanded?$('lens'):$('handle-lens');
         const box=element.getBoundingClientRect(),w=Math.round(box.width),h=Math.round(box.height);
         if(!w||!h)return;
+        // Bleed is real surrounding imagery, not stretched pixels from the lens center.
+        const margin=48,cw=w+margin*2,ch=h+margin*2;
+        lens.style.cssText=`left:-${margin}px;top:-${margin}px;width:${cw}px;height:${ch}px`;
         let renderer=renderers.get(lens);
-        if(!renderer){renderer=new MegaGlass.WebGLGlass(lens);renderers.set(lens,renderer);}
-        if(crop.width!==w||crop.height!==h){crop.width=w;crop.height=h;}
-        if(lens.width!==w||lens.height!==h){
-          renderer.resize(w,h,1);
-          renderer.setLenses([{x:0,y:0,w,h,radius:expanded?30:18,depth:12,scale:34,chroma:.10,specular:.28}]);
+        if(!renderer){renderer=new MegaGlass.WebGLGlass(lens,{compositeMode:'overlay',material:glassMaterial});renderers.set(lens,renderer);}
+        if(crop.width!==cw||crop.height!==ch){crop.width=cw;crop.height=ch;}
+        if(lens.width!==cw||lens.height!==ch){
+          renderer.resize(cw,ch,1);
+          renderer.setElements([{id:'surface',shape:'rect',x:margin,y:margin,width:w,height:h,radius:expanded?30:18}],false);
         }
+        const region={x:box.left-margin,y:box.top-margin,width:cw,height:ch};
         const bg=getComputedStyle(document.body).backgroundColor;
-        cropContext.clearRect(0,0,w,h);
-        cropContext.fillStyle=bg==='rgba(0, 0, 0, 0)'?'#05080d':bg;cropContext.fillRect(0,0,w,h);
-        // Capture the same screen coordinates, including GEV's opaque scope mask.
-        // Sampling only Cesium would expose terrain hidden by that mask.
-        const layers=[original,...['scope-mask','world-overlay-canvas'].map(id=>document.getElementById(id)).filter(Boolean)];
-        for(const layer of layers){
-          const parent=layer.getBoundingClientRect(),style=getComputedStyle(layer);
-          if(!parent.width||!parent.height||style.display==='none'||style.visibility==='hidden')continue;
-          cropContext.globalAlpha=Number(style.opacity)||0;
-          cropContext.drawImage(layer,(box.left-parent.left)*layer.width/parent.width,(box.top-parent.top)*layer.height/parent.height,w*layer.width/parent.width,h*layer.height/parent.height,0,0,w,h);
-        }
+        cropContext.setTransform(1,0,0,1,0,0);cropContext.clearRect(0,0,cw,ch);
+        cropContext.fillStyle=bg==='rgba(0, 0, 0, 0)'?'#05080d':bg;cropContext.fillRect(0,0,cw,ch);
+        if(original){
+          backdropKind='live-canvas+dom';
+          // Include GEV's opaque scope mask: the lens must not reveal hidden terrain.
+          const layers=[original,...['scope-mask','world-overlay-canvas'].map(id=>document.getElementById(id)).filter(Boolean)];
+          for(const layer of layers){
+            const parent=layer.getBoundingClientRect(),style=getComputedStyle(layer);
+            if(!parent.width||!parent.height||style.display==='none'||style.visibility==='hidden')continue;
+            cropContext.globalAlpha=Number(style.opacity)||0;
+            cropContext.drawImage(layer,(region.x-parent.left)*layer.width/parent.width,(region.y-parent.top)*layer.height/parent.height,cw*layer.width/parent.width,ch*layer.height/parent.height,0,0,cw,ch);
+          }
+        }else backdropKind='dom-repaint';
+        // Add correctly aligned DOM text/chrome, including open Home Assistant shadows.
+        // Re-measure periodically; the library also invalidates on DOM/layout changes.
+        if(performance.now()-lastDOM>1500){MegaGlass.invalidatePageContent();lastDOM=performance.now();}
         cropContext.globalAlpha=1;
-        renderer.setSource(crop);renderer.render();frameCount++;
+        cropContext.setTransform(1,0,0,1,-region.x,-region.y);
+        MegaGlass.paintPageContent(cropContext,region,null);
+        cropContext.setTransform(1,0,0,1,0,0);
+        cropContext.globalAlpha=1;
+        renderer.setBackdrop(crop,{update:'live',autoStart:false,shouldRender:false});
+        renderer.render({dpr:1});frameCount++;glassError='';
       } catch(error){glassError=error.message;}
     };
     const bindGlass = () => {
@@ -104,6 +119,8 @@
       paintGlass(true);
     };
     window.__megaKioskRefreshGlass=()=>paintGlass(true);
+    // GEV captures immediately after its WebGL draw; other apps refresh at 4 FPS.
+    domTimer=setInterval(()=>{if(!window.__godsEyeView?.viewer?.scene)paintGlass();},250);
     const bounds=()=>({x:Math.max(0,innerWidth-48-24),y:Math.max(0,innerHeight-48-24)});
     const place = () => {
       dock.classList.add('side');dock.style.left='12px';dock.style.top='12px';
@@ -161,7 +178,7 @@
       $('mic').classList.remove('on'); $('mic').textContent = 'GEV · Gemini starten';
     };
     window.__megaKioskDispose = () => {
-      events.abort(); clearTimeout(timer); detachRender?.(); stopAudio();
+      events.abort(); clearTimeout(timer); clearInterval(domTimer); detachRender?.(); stopAudio();
       for (const renderer of renderers.values()) renderer.destroy();
       cursorStyle.remove(); host.remove();
       window.__megaKioskVersion = undefined;
@@ -222,7 +239,7 @@
         players.add(player); player.onended = () => players.delete(player);
       }
     };
-    window.__megaKioskDiagnostics = () => ({open:dock.classList.contains('open'),voiceVisible:$('voice').style.display!=='none',tabs:$('tabs').children.length,handle:JSON.parse(JSON.stringify($('handle').getBoundingClientRect())),panel:JSON.parse(JSON.stringify($('panel').getBoundingClientRect())),glassFrames:frameCount,glassError});
+    window.__megaKioskDiagnostics = () => ({open:dock.classList.contains('open'),voiceVisible:$('voice').style.display!=='none',tabs:$('tabs').children.length,handle:JSON.parse(JSON.stringify($('handle').getBoundingClientRect())),panel:JSON.parse(JSON.stringify($('panel').getBoundingClientRect())),glassFrames:frameCount,glassError,glassEngine:MegaGlass.IOR_RENDERER,ior:glassMaterial.ior,dispersion:glassMaterial.dispersion,backdropKind,backdropMargin:48});
     on(document,'visibilitychange', () => { if (document.hidden && mic) { send({ action: 'voice-stop' }); stopAudio(); } });
     send({ action: 'ready' });
   };

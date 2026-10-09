@@ -16,8 +16,12 @@ export async function verifyOverlays(browser, _recover, attachKnownPages) {
   }
   await attachKnownPages();
   for (const { page } of known) {
-    assert.equal(await page.evaluate(() => window.__megaKioskVersion), 4.1);
+    assert.equal(await page.evaluate(() => window.__megaKioskVersion), 5.1);
     const diagnostics = await page.evaluate(() => window.__megaKioskDiagnostics());
+    assert.equal(diagnostics.glassEngine,'snell-v1');
+    assert.equal(diagnostics.ior,1.5);
+    assert.equal(diagnostics.glassError,'');
+    if(!await page.evaluate(()=>document.hidden))assert(diagnostics.glassFrames>0,'Visible apps must render optical glass');
     assert.equal(diagnostics.tabs, 4, 'Every known top-level app window must receive the switcher buttons');
     assert.equal(await page.evaluate(() => performance.timeOrigin), before.get(page), 'Attaching must not reload an existing page');
   }
@@ -26,7 +30,7 @@ export async function verifyOverlays(browser, _recover, attachKnownPages) {
   await mkdir(new URL('../logs/', import.meta.url), { recursive: true });
   await secondary.screenshot({ path: new URL('../logs/home-overlay-restored.png', import.meta.url).pathname });
   const report = { knownWindowsChecked: known.length, homeWindowsChecked: known.filter(item => item.home).length,
-    overlaysPresent: true, appButtonsPresent: true, existingDocumentsRetained: true };
+    overlaysPresent: true, appButtonsPresent: true, existingDocumentsRetained: true, glassEngine:'snell-v1',ior:1.5,noGlassErrors:true };
   await writeFile(new URL('../logs/overlay-verification.json', import.meta.url), JSON.stringify(report, null, 2));
   console.log(JSON.stringify(report));
 }

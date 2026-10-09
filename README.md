@@ -5,7 +5,7 @@ Touch-Kiosk für Ubuntu mit X11: God’s Eye View, Home Assistant, eine eigene A
 ## Oberfläche
 
 - Kleiner, verschiebbarer App-Knopf (48 × 48 Pixel, Symbol 18 Pixel).
-- Transparenter Liquid-Glass-Look mit dem originalen WebGL-Backend von `@tomagranate/liquid-glass`.
+- Transparenter Liquid-Glass-Effekt mit Snell-Lichtbrechung (IOR 1,5), RGB-Dispersion und Fresnel-Rändern über den V1-Renderer von `apple-liquid-glass-webgl`.
 - Das aufgeklappte App-Panel bleibt oben links und lässt sich nicht verschieben.
 - Vier vorgeladene App-Tabs im selben Vollbildfenster. Ein Wechsel aktiviert den vorhandenen Tab.
 - Zusätzliche Home-Assistant-Fenster erhalten ebenfalls den Switcher; eingebettete Frames bekommen kein zweites Overlay.
@@ -104,7 +104,7 @@ Dieses Repository enthält ausschließlich Quellcode, generische Beispielkonfigu
 ## Drittanbieter
 
 - [God’s Eye View](https://github.com/bilawalsidhu/gods-eye-view), separat installierter Upstream, auf den oben genannten Commit abgestimmt.
-- [Liquid Glass](https://github.com/TomaGranate/liquid-glass), MIT; unveränderte Originalquellen und Lizenz liegen unter `kiosk/vendor/liquid-glass`.
+- [Apple Liquid Glass WebGL](https://github.com/Oliverrr2424/webgl-apple-liquid-glass), MIT; Quellen, Lizenz und dokumentierte Anpassungen liegen unter `kiosk/vendor/liquid-glass`. Die Bibliothek rekonstruiert den Apple-Look; sie ist nicht Apples eigener Renderer. GEV/Whiteboard liefern echte Canvas-Pixel einschließlich 48 px Umgebung. Andere Apps verwenden einen lokalen DOM-Painter mit Open-Shadow-DOM-Unterstützung; SVG, Pseudoelemente, Formularfelder und fremde iFrames werden nicht vollständig reproduziert.
 - [noVNC](https://github.com/novnc/noVNC), separat heruntergeladen, Commit `a8dfd6a3ea3c74244f5ebdaa5a7f1023007a7820`; die Original-Lizenz bleibt im Download erhalten.
 - Puppeteer und ws werden mit dem Lockfile installiert.
 

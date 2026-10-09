@@ -35,7 +35,7 @@ export async function verifyUpdates(browser) {
     assert.equal((await browser.pages()).length, count, 'Switching must not create additional tabs');
     for (const [id, page] of entries) {
       assert.equal(await page.evaluate(() => performance.timeOrigin), initial.get(id), `${id} must not reload`);
-      assert.equal(await page.evaluate(() => window.__megaKioskVersion), 4.1);
+      assert.equal(await page.evaluate(() => window.__megaKioskVersion), 5.1);
       const diagnostics = await page.evaluate(() => window.__megaKioskDiagnostics());
       assert.equal(diagnostics.handle.width, 48);
       assert.equal(diagnostics.handle.height, 48);
