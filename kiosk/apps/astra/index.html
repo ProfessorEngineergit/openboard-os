@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Astra</title>
+  <link rel="stylesheet" href="/ui/tokens.css">
+  <link rel="stylesheet" href="/ui/kit.css">
+  <link rel="stylesheet" href="/apps/astra/astra.css">
+  <script src="/ui/icons.js"></script>
+  <script type="module" src="/apps/astra/main.js"></script>
+</head>
+<body data-view="glance" data-voice="idle">
+  <div id="app">
+    <main id="glance" class="view" aria-label="Übersicht">
+      <div class="g-left">
+        <div class="g-clock" id="g-clock" aria-live="off">--:--</div>
+        <div class="g-date" id="g-date"></div>
+        <div class="g-greeting" id="g-greeting"></div>
+        <div class="g-briefing" id="g-briefing" hidden></div>
+        <div class="g-chips" id="g-chips" hidden></div>
+        <div class="g-hint" id="g-hint" hidden></div>
+        <section class="g-events ob-glass" id="g-events" hidden></section>
+      </div>
+      <div class="g-right" id="g-weather"></div>
+    </main>
+
+    <main id="conversation" class="view" aria-label="Gespräch">
+      <header class="c-top">
+        <button id="c-glance" class="ob-btn glass pill" type="button" aria-label="Zur Übersicht">
+          <svg class="ob-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+          <span id="c-clock">--:--</span>
+        </button>
+        <div class="c-status" id="c-status"></div>
+        <button id="c-new" class="ob-btn glass pill" type="button">
+          <svg class="ob-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Neues Gespräch
+        </button>
+      </header>
+      <div id="thread" class="ob-scroll">
+        <div id="history"></div>
+        <div id="current"></div>
+      </div>
+    </main>
+
+    <footer id="composer">
+      <div id="voice-label" aria-live="polite"></div>
+      <div class="cmp-row">
+        <form id="ask" class="ask ob-glass" autocomplete="off">
+          <input id="ask-input" type="text" placeholder="Frag ASTRA …" enterkeyhint="send" autocomplete="off" autocorrect="off" spellcheck="false" aria-label="Frage an ASTRA">
+          <button class="send" type="submit" aria-label="Senden">
+            <svg class="ob-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5"/></svg>
+          </button>
+        </form>
+        <button id="orb" class="orb" type="button" data-state="idle" aria-label="Sprechen">
+          <span class="orb-halo"></span>
+          <span class="orb-ring"></span>
+          <span class="orb-arc"></span>
+          <span class="orb-core">
+            <svg class="ob-icon i-mic" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+            <svg class="ob-icon i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2.2" fill="currentColor" stroke="none"/></svg>
+            <span class="i-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          </span>
+        </button>
+        <div id="chips" class="chips"></div>
+      </div>
+    </footer>
+
+    <section id="alarm" class="alarm" hidden aria-label="Wecker" role="alertdialog">
+      <div class="al-glow"></div>
+      <div class="al-kicker">
+        <svg class="ob-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>
+        Wecker
+      </div>
+      <div id="al-time" class="al-time">--:--</div>
+      <div id="al-label" class="al-label"></div>
+      <div class="al-actions">
+        <button id="al-snooze" class="al-btn snooze" type="button">Schlummern · 9 min</button>
+        <button id="al-stop" class="al-btn stop" type="button">Stopp</button>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

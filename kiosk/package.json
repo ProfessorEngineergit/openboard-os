@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test lib/",
+    "test": "node --test lib/*.test.mjs",
     "verify": "node server.mjs --verify"
   },
   "dependencies": {
