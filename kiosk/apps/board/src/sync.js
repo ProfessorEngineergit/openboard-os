@@ -304,8 +304,8 @@ export class BoardSync {
     this.cacheTimer = setTimeout(() => this.onCache?.(), 2000);
   }
 
-  writeCache(boardId, scene) {
-    return idb.put('scenes', boardId, { scene, seq: this.seq, cached: Date.now() });
+  writeCache(boardId, name, scene) {
+    return idb.put('scenes', boardId, { id: boardId, name, scene, seq: this.seq, cached: Date.now() });
   }
 
   async fetchFile(boardId, id) {

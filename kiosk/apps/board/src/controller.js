@@ -324,12 +324,28 @@ export class BoardController {
     } catch (error) {
       console.warn('[board] runtime helper unavailable', error);
     }
-    await this.refreshBoards();
-    const boards = this.state.boards;
+    await this.bootBoards();
+  }
+
+  // Opens the remembered (or first) board. Without a reachable server the remembered
+  // board is loaded from the IndexedDB cache and the connection is retried in the background.
+  async bootBoards() {
+    const boards = await this.refreshBoards();
     const remembered = safeStorage(() => localStorage.getItem(LAST_BOARD_KEY), null);
-    const target = boards.find(b => b.id === remembered) || boards[0];
+    const target = boards?.find(b => b.id === remembered) || boards?.[0] || (boards === null && remembered ? { id: remembered } : null);
     if (target) await this.openBoard(target.id);
-    else this.store.set({ ready: true, status: 'offline' });
+    else { this.store.set({ ready: true, status: 'offline' }); this.watchServer(); }
+  }
+
+  // Retries until the server answers, then performs the normal start-up.
+  watchServer() {
+    if (this.serverTimer) return;
+    this.serverTimer = setInterval(async () => {
+      try { await request('/boards'); } catch { return; }
+      clearInterval(this.serverTimer);
+      this.serverTimer = null;
+      if (this.state.boardId) await this.pullRemote(); else await this.bootBoards();
+    }, 4000);
   }
 
   async refreshBoards() {
@@ -340,7 +356,7 @@ export class BoardController {
       if (current) this.store.set({ boardName: current.name });
       return boards;
     } catch {
-      return this.state.boards;
+      return null;
     }
   }
 
@@ -355,8 +371,11 @@ export class BoardController {
       this.store.set({ busy: false, error: error.message });
       if (error instanceof HttpError && error.status === 404) {
         const boards = await this.refreshBoards();
-        if (boards[0] && boards[0].id !== id) return this.openBoard(boards[0].id);
+        if (boards?.[0] && boards[0].id !== id) return this.openBoard(boards[0].id);
       }
+      // Neither server nor local cache: keep an empty, offline board and retry in the background.
+      if (!this.state.boardId) { this.store.set({ ready: true, status: 'offline' }); this.watchServer(); }
+      this.flash(error instanceof HttpError ? 'Board nicht ladbar' : 'Server nicht erreichbar');
       return;
     }
     safeStorage(() => localStorage.setItem(LAST_BOARD_KEY, id));
@@ -389,30 +408,45 @@ export class BoardController {
     if (files.length && boardId === this.state.boardId) this.api.addFiles(files);
   }
 
-  async createBoard(name) {
-    const board = await request('/boards', { method: 'POST', body: { name: name || 'Neues Board' } });
-    await this.refreshBoards();
-    await this.openBoard(board.id);
-    this.store.set({ sheet: null });
-    return board;
+  // Board management needs the server; failures show a notice instead of an unhandled rejection.
+  async serverAction(fn) {
+    try { return await fn(); } catch (error) {
+      console.warn('[board] action failed', error);
+      this.flash(error instanceof HttpError ? error.message : 'Server nicht erreichbar');
+      return undefined;
+    }
   }
 
-  async renameBoard(id, name) {
-    await request(`/boards/${encodeURIComponent(id)}`, { method: 'PATCH', body: { name } });
-    await this.refreshBoards();
+  createBoard(name) {
+    return this.serverAction(async () => {
+      const board = await request('/boards', { method: 'POST', body: { name: name || 'Neues Board' } });
+      await this.refreshBoards();
+      await this.openBoard(board.id);
+      this.store.set({ sheet: null });
+      return board;
+    });
   }
 
-  async deleteBoard(id) {
-    await request(`/boards/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    const boards = await this.refreshBoards();
-    if (id === this.state.boardId && boards[0]) await this.openBoard(boards[0].id);
+  renameBoard(id, name) {
+    return this.serverAction(async () => {
+      await request(`/boards/${encodeURIComponent(id)}`, { method: 'PATCH', body: { name } });
+      await this.refreshBoards();
+    });
+  }
+
+  deleteBoard(id) {
+    return this.serverAction(async () => {
+      await request(`/boards/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const boards = await this.refreshBoards();
+      if (id === this.state.boardId && boards?.[0]) await this.openBoard(boards[0].id);
+    });
   }
 
   async onBoardEvent(event) {
     if (!event) return;
     if (event.kind && event.kind !== 'ops') this.refreshBoards();
     if (event.id !== this.state.boardId) return;
-    if (event.kind === 'deleted') { const boards = await this.refreshBoards(); if (boards[0]) this.openBoard(boards[0].id); return; }
+    if (event.kind === 'deleted') { const boards = await this.refreshBoards(); if (boards?.[0]) this.openBoard(boards[0].id); return; }
     if (event.kind === 'restore') { await this.openBoard(event.id); return; }
     if (event.client === this.clientId || this.sync.ownSeqs.has(event.seq)) return;
     if (Number.isFinite(event.seq) && event.seq <= this.sync.seq) return;
@@ -437,6 +471,10 @@ export class BoardController {
       this.sync.paused = false;
       this.sync.seq = Math.max(this.sync.seq, data.seq);
       this.loadFiles(id, Object.keys(data.scene.files || {}));
+      if (this.state.status === 'offline' || this.state.status === 'error') {
+        // The server answered again: push what is still unsent, otherwise we are in sync.
+        if (this.sync.pendingCount) this.sync.schedule(50); else this.sync.setStatus('saved');
+      }
     } catch (error) {
       console.warn('[board] pull failed', error);
     } finally {
@@ -451,7 +489,7 @@ export class BoardController {
     const st = this.api.getAppState();
     const files = {};
     for (const [fid, f] of Object.entries(this.api.getFiles())) files[fid] = { id: fid, mimeType: f.mimeType };
-    this.sync.writeCache(id, {
+    this.sync.writeCache(id, this.state.boardName, {
       elements: this.api.getSceneElementsIncludingDeleted(),
       appState: { viewBackgroundColor: st.viewBackgroundColor, scrollX: st.scrollX, scrollY: st.scrollY, zoom: { value: st.zoom.value } },
       files,

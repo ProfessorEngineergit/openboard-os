@@ -246,7 +246,7 @@ export function Toolbar({ c }) {
         <Tool id="select" name={s.selectMode === 'lasso' ? 'lasso' : 'select'} label="Auswählen" pressed={s.tool === 'select' || s.tool === 'lasso'}
           onClick={() => (s.tool === 'select' || s.tool === 'lasso' ? toggle('select') : c.setTool(s.selectMode === 'lasso' ? 'lasso' : 'select'))} />
         <Tool id="shape" name={shapeIcon} label="Formen" pressed={s.tool === 'shape'}
-          onClick={() => (s.tool === 'shape' ? toggle('shape') : c.setTool('shape'))} />
+          onClick={() => (s.tool === 'shape' ? toggle('shape') : c.setTool('shape', { popover: 'shape' }))} />
         <Tool id="text" name="text" label="Text" pressed={s.tool === 'text'} onClick={() => c.setTool('text')} />
         <Tool id="sticky" name="sticky" label="Notiz" pressed={s.tool === 'sticky'} onClick={() => c.setTool('sticky')} />
         <span className="tb-sep" />
