@@ -1,0 +1,63 @@
+/* OpenBoard UI kit. Requires tokens.css. Touch-first: every control >= --ob-touch. */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--ob-bg);color:var(--ob-text);font-family:var(--ob-font);font-size:var(--ob-t);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;user-select:none;overscroll-behavior:none}
+body{cursor:none}
+input,textarea,select{user-select:text}
+:focus-visible{outline:2px solid var(--ob-ring);outline-offset:2px}
+svg.ob-icon{width:var(--ob-icon);height:var(--ob-icon);fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* Glass surface (CSS path). The shell upgrades its own surfaces to WebGL glass. */
+.ob-glass{position:relative;isolation:isolate;background:var(--ob-glass-tint),var(--ob-glass-fill);border:1px solid var(--ob-glass-edge);box-shadow:var(--ob-glass-inset),var(--ob-glass-shadow);backdrop-filter:blur(var(--ob-glass-blur)) saturate(var(--ob-glass-saturate));-webkit-backdrop-filter:blur(var(--ob-glass-blur)) saturate(var(--ob-glass-saturate));border-radius:var(--ob-r-lg)}
+.ob-glass.strong{background:var(--ob-glass-tint),var(--ob-glass-fill-strong)}
+.ob-card{background:var(--ob-surface);border:1px solid var(--ob-border);border-radius:var(--ob-r-lg);padding:var(--ob-s5)}
+
+/* Buttons */
+.ob-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:var(--ob-s2);min-height:var(--ob-touch);min-width:var(--ob-touch);padding:0 var(--ob-s5);border-radius:var(--ob-r-pill);border:1px solid var(--ob-hair);background:var(--ob-surface-2);color:var(--ob-text);font:500 var(--ob-t)/1 var(--ob-font);touch-action:manipulation;transition:transform var(--ob-dur-fast) var(--ob-ease),background var(--ob-dur-fast)}
+.ob-btn:active{transform:scale(.96);background:var(--ob-surface-3)}
+.ob-btn:disabled{opacity:.4}
+.ob-btn.primary{background:var(--ob-accent);color:var(--ob-accent-ink);border-color:transparent}
+.ob-btn.danger{background:var(--ob-err-bg);color:var(--ob-err);border-color:transparent}
+.ob-btn.ghost{background:transparent}
+.ob-btn.glass{background:var(--ob-glass-tint),var(--ob-glass-fill);border-color:var(--ob-glass-edge);box-shadow:var(--ob-glass-inset);backdrop-filter:blur(var(--ob-glass-blur)) saturate(var(--ob-glass-saturate))}
+.ob-btn.icon{padding:0;border-radius:50%}
+.ob-btn.selected,.ob-btn[aria-pressed="true"]{background:var(--ob-glass-selected);border-color:var(--ob-glass-edge)}
+
+/* Lists (Settings style) */
+.ob-group{background:var(--ob-surface);border:1px solid var(--ob-border);border-radius:var(--ob-r-lg);overflow:hidden;margin:0 0 var(--ob-s5)}
+.ob-group-title{font-size:var(--ob-t-xs);font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ob-text-faint);margin:var(--ob-s5) var(--ob-s4) var(--ob-s2)}
+.ob-row{display:flex;align-items:center;gap:var(--ob-s4);min-height:var(--ob-touch-lg);padding:var(--ob-s3) var(--ob-s5);border-top:1px solid var(--ob-hair)}
+.ob-row:first-child{border-top:0}
+.ob-row .label{flex:1;min-width:0}
+.ob-row .label small{display:block;color:var(--ob-text-dim);font-size:var(--ob-t-sm);margin-top:2px;line-height:1.35}
+.ob-row .value{color:var(--ob-text-dim)}
+.ob-hint{color:var(--ob-text-dim);font-size:var(--ob-t-sm);line-height:1.5;margin:var(--ob-s2) var(--ob-s4) var(--ob-s5)}
+
+/* Inputs */
+.ob-input,.ob-select{appearance:none;min-height:var(--ob-touch);width:100%;padding:0 var(--ob-s4);border-radius:var(--ob-r-sm);border:1px solid var(--ob-border);background:var(--ob-bg-2);color:var(--ob-text);font:400 var(--ob-t) var(--ob-font)}
+.ob-input:focus,.ob-select:focus{border-color:var(--ob-ring);outline:none}
+.ob-input.inline{width:min(520px,52%)}
+
+/* Switch */
+.ob-switch{appearance:none;position:relative;width:64px;height:38px;border-radius:var(--ob-r-pill);background:var(--ob-surface-3);border:1px solid var(--ob-border);transition:background var(--ob-dur) var(--ob-ease);flex:none;margin:0}
+.ob-switch::after{content:"";position:absolute;top:3px;left:3px;width:30px;height:30px;border-radius:50%;background:#fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transition:transform var(--ob-dur) var(--ob-spring)}
+.ob-switch:checked{background:var(--ob-ok);border-color:transparent}
+.ob-switch:checked::after{transform:translateX(26px)}
+
+/* Segmented control */
+.ob-seg{display:inline-flex;padding:3px;gap:3px;border-radius:var(--ob-r-pill);background:var(--ob-surface-3)}
+.ob-seg button{appearance:none;border:0;min-height:calc(var(--ob-touch) - 8px);padding:0 var(--ob-s4);border-radius:var(--ob-r-pill);background:transparent;color:var(--ob-text-dim);font:500 var(--ob-t-sm) var(--ob-font)}
+.ob-seg button[aria-pressed="true"]{background:var(--ob-surface);color:var(--ob-text);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+
+/* Badges and meters */
+.ob-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:var(--ob-r-pill);font-size:var(--ob-t-xs);font-weight:600;background:var(--ob-surface-3);color:var(--ob-text-dim)}
+.ob-badge.ok{background:var(--ob-ok-bg);color:var(--ob-ok)}
+.ob-badge.warn{background:var(--ob-warn-bg);color:var(--ob-warn)}
+.ob-badge.err{background:var(--ob-err-bg);color:var(--ob-err)}
+.ob-meter{height:8px;border-radius:var(--ob-r-pill);background:var(--ob-surface-3);overflow:hidden}
+.ob-meter>i{display:block;height:100%;border-radius:inherit;background:var(--ob-accent);transition:width var(--ob-dur) var(--ob-ease)}
+
+/* Scroll areas: touch panning only, no rubber band into the shell */
+.ob-scroll{overflow:auto;overscroll-behavior:contain;touch-action:pan-y;scrollbar-width:none}
+.ob-scroll::-webkit-scrollbar{display:none}
+
+.ob-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
