@@ -169,7 +169,8 @@
   "board": {
     "paper": "auto",
     "lowLatency": true,
-    "prediction": true
+    "prediction": true,
+    "autoHideToolbar": true
   },
   "updates": {
     "enabled": true,

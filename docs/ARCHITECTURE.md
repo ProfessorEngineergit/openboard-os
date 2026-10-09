@@ -89,7 +89,8 @@ Die Datei wird beim Start aus Version 1 migriert. Geheimnisse (`*.key`, `*.token
   "astra": { "url": "", "token": "", "voice": true, "briefingOnDisplay": true },
   "mqtt": { "url": "", "username": "", "password": "", "discoveryPrefix": "homeassistant", "nodeId": "openboard" },
   "gemini": { "key": "", "model": "gemini-3.8-live" },
-  "board": { "paper": "auto", "lowLatency": true, "prediction": true },
+  "board": { "paper": "auto", "lowLatency": true, "prediction": true, "autoHideToolbar": true },
+  // autoHideToolbar: Werkzeugleiste blendet sich während des Zeichnens aus (hält Compositing-Ebenen vom Tinten-Canvas fern)
   "updates": { "enabled": true, "branch": "main", "intervalSeconds": 60, "restartBrowser": "idle" }
 }
 ```

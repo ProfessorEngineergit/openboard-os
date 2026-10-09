@@ -260,6 +260,12 @@ export function Toolbar({ c }) {
         <Tool id="collapse" name="collapse" label="Werkzeugleiste ausblenden" onClick={() => c.store.set({ collapsed: true, popover: null, sheet: null })} />
       </div>
 
+      {s.hasSelection && s.tool === 'select' && !s.popover && !s.sheet && (
+        <div className="tb-sel ob-glass" role="toolbar" aria-label="Auswahl">
+          <button type="button" className="pill" onClick={() => c.selectionAction('duplicate')}><Icon name="duplicate" />Duplizieren</button>
+          <button type="button" className="pill danger-text" onClick={() => c.selectionAction('delete')}><Icon name="trash" />Löschen</button>
+        </div>
+      )}
       {s.popover === 'color' && <ColorPanel c={c} s={s} />}
       {s.popover === 'shape' && (
         <Popover anchor="shape" seg>

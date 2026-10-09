@@ -144,8 +144,9 @@ export class BoardSync {
   }
 
   // Diff from Excalidraw's onChange (elements include deleted ones).
+  // Returns true when elements changed (as opposed to view-only changes).
   track(elements, appState, files) {
-    if (!this.boardId || this.paused) return;
+    if (!this.boardId || this.paused) return false;
     let changed = false;
     const inProgress = appState.newElement?.id;
     for (const el of elements) {
@@ -178,6 +179,7 @@ export class BoardSync {
     for (const id in files) if (!this.fileMeta.has(id) && !this.fileUploads.has(id)) this.uploadFile(files[id]);
     if (changed) { this.setStatus('saving'); this.schedule(300); }
     else if (appChanged) this.schedule(2000, true);
+    return changed;
   }
 
   schedule(delay, lazy = false) {

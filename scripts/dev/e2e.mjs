@@ -45,7 +45,7 @@ if (existsSync(resolve(repo, 'scripts/dev/mock-astra.mjs'))) {
   children.push(spawn(process.execPath, [resolve(repo, 'scripts/dev/mock-astra.mjs'), '--port', '18088', '--token', 'dev'], { stdio: 'ignore' }));
 }
 const chrome = spawn(chromiumPath(), ['--headless=new', `--remote-debugging-port=${DEBUG}`, '--remote-debugging-address=127.0.0.1', `--user-data-dir=${work}/profile`,
-  '--window-size=1920,1080', '--no-first-run', '--disable-pinch', '--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore' });
+  '--window-size=1920,1080', '--no-first-run', '--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', ...(process.getuid?.() === 0 ? ['--no-sandbox'] : []), 'about:blank'], { stdio: 'ignore' });
 children.push(chrome);
 await writeFile(`${work}/config.json`, JSON.stringify({
   version: 2,
@@ -255,6 +255,22 @@ try {
     const foreign = await fetch(base + '/api/local/config', { method: 'PATCH', headers: { 'content-type': 'application/json', origin: 'https://evil.example' }, body: '{}' });
     assert.equal(foreign.status, 403);
     assert.equal((await fetch(base + '/api/v1/state')).status, 401);
+  });
+
+  await step('pinch zoom is locked in every app (no --disable-pinch needed)', async () => {
+    const problems = [];
+    for (const [id, prefix] of [['settings', `${APP}/apps/settings/`], ['board', `${APP}/apps/board/`], ['astra', `${APP}/apps/astra/`], ['home', 'http://localhost:8123/']]) {
+      await api(`/api/local/apps/${id}/activate`, { method: 'POST' });
+      const page = await pageFor(prefix);
+      await sleep(600);
+      const session = await page.createCDPSession();
+      await session.send('Input.synthesizePinchGesture', { x: 800, y: 400, scaleFactor: 2.5, relativeSpeed: 600, gestureSourceType: 'touch' }).catch(() => {});
+      await sleep(500);
+      const scale = await page.evaluate(() => window.visualViewport.scale);
+      if (Math.abs(scale - 1) > 0.01) problems.push(`${id}: scale ${scale}`);
+      await session.detach();
+    }
+    assert.deepEqual(problems, []);
   });
 
   await step('portrait (1080×1920): built-in apps and the dock fit without horizontal overflow', async () => {

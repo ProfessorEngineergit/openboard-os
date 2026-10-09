@@ -174,7 +174,9 @@ const mount = () => {
   // Document-level helpers: hidden cursor, fixed zoom, fonts (fonts can't load inside shadow DOM).
   const docStyle = document.createElement('style');
   docStyle.id = 'openboard-shell-doc';
-  docStyle.textContent = `html,body,body *{cursor:none!important}${FONT_CSS}`;
+  // touch-action pan-x pan-y on <html> removes pinch and double-tap zoom everywhere (descendants can only
+  // narrow it further, e.g. canvases that handle gestures themselves use none).
+  docStyle.textContent = `html,body,body *{cursor:none!important}html{touch-action:pan-x pan-y!important;overscroll-behavior:none}${FONT_CSS}`;
   document.documentElement.appendChild(docStyle);
   let viewport = document.querySelector('meta[name="viewport"]'), viewportCreated = false;
   const viewportBefore = viewport?.getAttribute('content');
@@ -701,6 +703,10 @@ const mount = () => {
   let appliedFrost = null;
   const crop = document.createElement('canvas'), cropContext = crop.getContext('2d');
   const glassMode = () => state?.appearance?.glass || 'webgl';
+  const roundedRectPath = ({ x, y, width, height, radius }) => {
+    const r = Math.max(0, Math.min(radius, width / 2, height / 2)), n = value => Math.round(value * 100) / 100;
+    return `M${n(x + r)} ${n(y)}H${n(x + width - r)}A${n(r)} ${n(r)} 0 0 1 ${n(x + width)} ${n(y + r)}V${n(y + height - r)}A${n(r)} ${n(r)} 0 0 1 ${n(x + width - r)} ${n(y + height)}H${n(x + r)}A${n(r)} ${n(r)} 0 0 1 ${n(x)} ${n(y + height - r)}V${n(y + r)}A${n(r)} ${n(r)} 0 0 1 ${n(x + r)} ${n(y)}Z`;
+  };
   function paintGlass(force = false) {
     if (glassMode() !== 'webgl' || typeof MegaGlass === 'undefined' || !isOpen() || document.hidden) return;
     if (!force && performance.now() - glass.last < 140) return;
@@ -710,7 +716,7 @@ const mount = () => {
       const rowBox = row.getBoundingClientRect();
       const margin = 48, cw = Math.round(rowBox.width + margin * 2), ch = Math.round(rowBox.height + margin * 2);
       if (!rowBox.width) return;
-      lens.style.cssText = `left:-${margin}px;top:-${margin}px;width:${cw}px;height:${ch}px`;
+      lens.style.left = `-${margin}px`; lens.style.top = `-${margin}px`; lens.style.width = `${cw}px`; lens.style.height = `${ch}px`;
       if (!glass.renderer) glass.renderer = new MegaGlass.WebGLGlass(lens, { compositeMode: 'overlay', material: materialFor(frostOf()) });
       appliedFrost = `${frostOf()}|${root.dataset.obTheme}`;
       if (crop.width !== cw || crop.height !== ch) { crop.width = cw; crop.height = ch; }
@@ -719,7 +725,12 @@ const mount = () => {
         return { id: 's' + index, shape: 'rect', x: box.left - rowBox.left + margin, y: box.top - rowBox.top + margin, width: box.width, height: box.height, radius: parseFloat(getComputedStyle(element).borderTopLeftRadius) || 32 };
       });
       const signature = JSON.stringify(shapes);
-      if (lens.width !== cw || lens.height !== ch || glass.signature !== signature) { glass.renderer.resize(cw, ch, 1); glass.renderer.setElements(shapes, false); glass.signature = signature; }
+      if (lens.width !== cw || lens.height !== ch || glass.signature !== signature) {
+        glass.renderer.resize(cw, ch, 1); glass.renderer.setElements(shapes, false); glass.signature = signature;
+        // The lens samples a margin around each surface for its bleed; clip it to the surface shapes so
+        // no rim light, smear or second outline is drawn outside the glass.
+        lens.style.clipPath = `path('${shapes.map(roundedRectPath).join(' ')}')`;
+      }
       const region = { x: rowBox.left - margin, y: rowBox.top - margin, width: cw, height: ch };
       const bg = getComputedStyle(document.body || document.documentElement).backgroundColor;
       cropContext.setTransform(1, 0, 0, 1, 0, 0); cropContext.clearRect(0, 0, cw, ch);

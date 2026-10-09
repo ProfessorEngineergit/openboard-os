@@ -130,7 +130,7 @@ export class BoardController {
     const root = document.querySelector('.board-root');
     if (!root) return;
     if (active) { if (this.config.autoHideToolbar !== false) root.classList.add('inking'); return; }
-    this.inkingTimer = setTimeout(() => root.classList.remove('inking'), 650);
+    this.inkingTimer = setTimeout(() => root.classList.remove('inking'), 350);
   }
 
   inkStyle() {
@@ -143,7 +143,7 @@ export class BoardController {
   }
 
   onChange(elements, appState, files) {
-    this.sync.track(elements, appState, files);
+    if (this.sync.track(elements, appState, files) && this.undoStale) { this.undoStale = false; this.readHistoryState(); }
     // Excalidraw switches back to selection after text/shapes; mirror that in the toolbar.
     const type = appState.activeTool.type;
     if (type !== this.lastTool) {
@@ -280,7 +280,8 @@ export class BoardController {
     }], { regenerateIds: true });
     api.updateScene({
       elements: [...api.getSceneElementsIncludingDeleted(), note],
-      appState: { selectedElementIds: { [note.id]: true } },
+      // Note text is always ink-colored, whatever pen color is active (applyTool restores it on the next tool change).
+      appState: { selectedElementIds: { [note.id]: true }, currentItemStrokeColor: SWATCHES[0].color },
       captureUpdate: CaptureUpdateAction.IMMEDIATELY,
     });
     this.store.set({ tool: 'select' });
@@ -299,14 +300,18 @@ export class BoardController {
     return document.querySelector(`.board-canvas .${kind}-button-container button`);
   }
 
+  // Excalidraw's history.clear() does not notify its buttons, so after loading a board their DOM state
+  // can be stale: until the next real edit both directions are treated as unavailable.
+  readHistoryState() {
+    const undo = this.historyButton('undo'), redo = this.historyButton('redo');
+    const stale = this.undoStale;
+    this.store.set({ canUndo: !stale && !!undo && !undo.disabled, canRedo: !stale && !!redo && !redo.disabled });
+  }
+
   watchUndo() {
-    const update = () => {
-      const undo = this.historyButton('undo'), redo = this.historyButton('redo');
-      this.store.set({ canUndo: !!undo && !undo.disabled, canRedo: !!redo && !redo.disabled });
-    };
     const root = document.querySelector('.board-canvas');
-    new MutationObserver(update).observe(root, { subtree: true, attributes: true, attributeFilter: ['disabled'], childList: true });
-    update();
+    new MutationObserver(() => this.readHistoryState()).observe(root, { subtree: true, attributes: true, attributeFilter: ['disabled'], childList: true });
+    this.readHistoryState();
   }
 
   history(kind) {
@@ -393,6 +398,8 @@ export class BoardController {
     const elements = restoreElements(data.elements, null, { refreshDimensions: false, repairBindings: true });
     const app = data.appState || {};
     this.sync.paused = true;
+    // History first, so the (re-rendered) undo/redo buttons reflect the empty stacks of the new board.
+    api.history.clear();
     api.updateScene({
       elements,
       appState: {
@@ -405,7 +412,8 @@ export class BoardController {
     });
     this.sync.acknowledge(api.getSceneElementsIncludingDeleted().filter(el => !this.sync.out.upserts.has(el.id)));
     this.sync.paused = false;
-    api.history.clear();
+    this.undoStale = true;
+    this.readHistoryState();
     const name = data.name || this.state.boards.find(b => b.id === id)?.name || 'Whiteboard';
     this.store.set({ boardId: id, boardName: name, ready: true, busy: false, error: null, snapshots: null });
     this.applyTool();
@@ -564,6 +572,20 @@ export class BoardController {
     api.updateScene({ elements, appState: { selectedElementIds: {} }, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
     this.store.set({ popover: null });
     this.flash('Tafel geleert – Rückgängig möglich');
+  }
+
+  // Selection actions for the contextual bar (Excalidraw's own panel is hidden). Delete is a soft delete
+  // (undoable and synced as tombstone); duplicate reuses Excalidraw's shortcut so bindings/groups stay intact.
+  selectionAction(kind) {
+    const api = this.api;
+    if (kind === 'delete') {
+      const selected = api.getAppState().selectedElementIds;
+      const elements = api.getSceneElementsIncludingDeleted().map(el => (selected[el.id] && !el.isDeleted ? newElementWith(el, { isDeleted: true }) : el));
+      api.updateScene({ elements, appState: { selectedElementIds: {} }, captureUpdate: CaptureUpdateAction.IMMEDIATELY });
+      return;
+    }
+    const container = document.querySelector('.board-canvas .excalidraw');
+    container?.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', code: 'KeyD', ctrlKey: true, bubbles: true, cancelable: true }));
   }
 
   zoomToFit() {

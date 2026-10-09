@@ -26,15 +26,16 @@ body { background: #fff; }
 .ink-layer { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 4; }
 
 /* ---- Toolbar ---- */
-/* While a stroke is being drawn the glass toolbar is removed from compositing: nothing sits above the
-   desynchronized ink canvas and no backdrop blur has to be re-evaluated per frame. */
-.tb-wrap { transition: opacity 220ms var(--ob-ease), visibility 0s linear 0s; }
-.board-root.inking .tb-wrap { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 70ms linear, visibility 0s linear 70ms; }
+/* While a stroke is being drawn the glass toolbar is faded to opacity 0 (fully transparent layers are not
+   composited): nothing sits above the desynchronized ink canvas and no backdrop blur is evaluated per
+   frame. It stays hit-testable so a tap right after a stroke still reaches the buttons. */
 .tb-wrap {
   position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 10;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
   font-family: var(--ob-font); color: var(--ob-text); max-width: calc(100vw - 160px);
+  transition: opacity 180ms var(--ob-ease);
 }
+.board-root.inking .tb-wrap { opacity: 0; transition: opacity 60ms linear; }
 .tb {
   display: flex; align-items: center; gap: 2px; padding: 6px;
   border-radius: var(--ob-r-pill) !important;
@@ -84,6 +85,13 @@ body { background: #fff; }
 .tb.collapsed .dot { width: 20px; height: 20px; border-radius: 50%; box-shadow: 0 0 0 2px var(--ob-glass-edge); }
 .tb.collapsed .status-dot { margin: 0 6px 0 10px; }
 
+/* ---- Selection bar (below the toolbar, only while something is selected) ---- */
+.tb-sel { display: flex; gap: 4px; padding: 6px; border-radius: 999px !important; animation: pop-in var(--ob-dur) var(--ob-spring); transform-origin: top center; }
+.tb-sel .pill { background: transparent; border-color: transparent; min-height: 52px; }
+.tb-sel .pill:active { background: var(--ob-glass-pressed); }
+.tb-sel .pill.danger-text { color: var(--ob-err); }
+[data-ob-theme="light"] .tb-sel .pill.danger-text { color: #c92a2a; }
+
 /* ---- Popovers ---- */
 .tb-pop {
   --pad: 14px; --inner: 18px;
@@ -92,7 +100,7 @@ body { background: #fff; }
   transition: opacity var(--ob-dur-fast);
 }
 @keyframes pop-in { from { opacity: 0; transform: translateY(-8px) scale(.96); } }
-.pop-label { font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ob-text-faint); margin: 2px 6px 8px; }
+.pop-label { font-size: 12px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ob-text-dim); margin: 2px 6px 8px; }
 .pop-label + * + .pop-label { margin-top: 14px; }
 .swatches { display: grid; grid-template-columns: repeat(4, var(--ob-touch)); gap: 6px; }
 .swatch { appearance: none; border: 0; background: transparent; width: var(--ob-touch); height: var(--ob-touch); border-radius: 50%; display: grid; place-items: center; touch-action: manipulation; transition: transform var(--ob-dur-fast) var(--ob-ease); }
@@ -111,7 +119,7 @@ body { background: #fff; }
 .seg-row { display: flex; gap: 2px; }
 .menu { display: flex; flex-direction: column; min-width: 340px; }
 .menu-item { appearance: none; border: 0; background: transparent; color: var(--ob-text); min-height: var(--ob-touch); padding: 0 16px 0 12px; border-radius: var(--ob-r); display: flex; align-items: center; gap: 14px; font: 500 17px var(--ob-font); text-align: left; white-space: nowrap; touch-action: manipulation; }
-.menu-item small { margin-left: auto; padding-left: 16px; color: var(--ob-text-faint); font-size: 13px; font-weight: 400; }
+.menu-item small { margin-left: auto; padding-left: 16px; color: var(--ob-text-dim); font-size: 13px; font-weight: 400; }
 .menu-item:active { background: var(--ob-glass-pressed); }
 .menu-item.danger { color: var(--ob-err); }
 [data-ob-theme="light"] .menu-item.danger { color: #c92a2a; }

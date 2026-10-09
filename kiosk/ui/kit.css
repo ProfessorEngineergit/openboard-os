@@ -1,5 +1,6 @@
 /* OpenBoard UI kit. Requires tokens.css. Touch-first: every control >= --ob-touch. */
 *,*::before,*::after{box-sizing:border-box}
+html{touch-action:pan-x pan-y}
 html,body{margin:0;height:100%;background:var(--ob-bg);color:var(--ob-text);font-family:var(--ob-font);font-size:var(--ob-t);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;user-select:none;overscroll-behavior:none}
 body{cursor:none}
 input,textarea,select{user-select:text}
