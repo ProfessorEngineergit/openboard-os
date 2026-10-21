@@ -2,9 +2,9 @@
 
 Eigenständiges Projekt; nicht mit dem etablierten [OpenBoard](https://github.com/OpenBoard-org/OpenBoard) verbunden.
 
-Ein leichtgewichtiges **Whiteboard-Betriebssystem** für große Touch-Displays. Es läuft als Kiosk auf Ubuntu mit X11 und verwandelt einen normalen Rechner mit Touchscreen in ein schnelles, ruhiges Board mit Apps, Dock, Widgets und einem persönlichen KI-Assistenten.
+Ein **Touch-Workspace-Prototyp auf Ubuntu** für große Touch-Displays. Es läuft als Kiosk auf Ubuntu mit X11 und verwandelt einen normalen Rechner mit Touchscreen in ein schnelles, ruhiges Board mit Apps, Dock, Widgets und einem persönlichen KI-Assistenten.
 
-Entwickelt und getestet auf einem Sharp LT60 (60 Zoll, Full HD, Intel HD 630). Alles ist so gebaut, dass es auf schwacher Hardware flüssig bleibt. God's Eye View, Home Assistant und Astra sind Beispiele einer Installation; weitere Web-Apps lassen sich in den Einstellungen hinzufügen.
+Entwickelt und getestet auf einem Sharp LT60 (60 Zoll, Full HD, Intel HD 630). Die Entwicklung richtet sich auch an schwache Hardware; die Leistung hängt von den geöffneten Web-Apps ab. God's Eye View, Home Assistant und Astra sind Beispiele einer Installation; weitere Web-Apps lassen sich in den Einstellungen hinzufügen.
 
 - **Unsichtbar, bis man es braucht.** Von unten nach oben wischen öffnet das Dock. Sonst gehört der ganze Bildschirm der App.
 - **Apps bleiben geladen.** Alle Apps laufen als Tabs in einem Fenster. Ein Wechsel lädt nichts neu.
@@ -183,3 +183,7 @@ Das Repository enthält nur Quellcode, generische Beispielkonfiguration und Abh�
 - [noVNC](https://github.com/novnc/noVNC), separat heruntergeladen, Commit `a8dfd6a3ea3c74244f5ebdaa5a7f1023007a7820`
 - [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view), separat installiert, Commit `6be25595b16491ce01ffd8d81e66921f321ee200`
 - Puppeteer, ws, mqtt (MIT)
+
+## Entwicklung und KI-Beteiligung
+
+Die Historie des Hauptbranches enthält ausdrücklich Claude zugeschriebene Beiträge ([Beispiel](https://github.com/ProfessorEngineergit/openboard-os/commit/ac9c629a3ef9454f9f897cc7c435d12c269a1073)). Das belegt KI-Beteiligung an diesen Beiträgen, nicht die Herkunft jeder Zeile oder eine unabhängige Prüfung. Bestehende Autor-, Co-Autoren- und Sitzungsangaben bleiben erhalten.
