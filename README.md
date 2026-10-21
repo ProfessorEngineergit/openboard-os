@@ -184,6 +184,6 @@ Das Repository enthält nur Quellcode, generische Beispielkonfiguration und Abh�
 - [God's Eye View](https://github.com/bilawalsidhu/gods-eye-view), separat installiert, Commit `6be25595b16491ce01ffd8d81e66921f321ee200`
 - Puppeteer, ws, mqtt (MIT)
 
-## Entwicklung und KI-Beteiligung
+## KI-Beteiligung
 
-Die Historie des Hauptbranches enthält ausdrücklich Claude zugeschriebene Beiträge ([Beispiel](https://github.com/ProfessorEngineergit/openboard-os/commit/ac9c629a3ef9454f9f897cc7c435d12c269a1073)). Das belegt KI-Beteiligung an diesen Beiträgen, nicht die Herkunft jeder Zeile oder eine unabhängige Prüfung. Bestehende Autor-, Co-Autoren- und Sitzungsangaben bleiben erhalten.
+Einzelne Code-Beiträge sind ausdrücklich KI-Tools zugeschrieben: [generated with Claude Code](https://github.com/ProfessorEngineergit/openboard-os/commit/8f817096bd1973e4ab249b4155e466288f174a78). Das gilt für diese Beiträge, nicht pauschal für alle Dateien.
